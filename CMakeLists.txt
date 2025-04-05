@@ -22,7 +22,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-find_package(Boost COMPONENTS system container REQUIRED) # Ставить через vcpkg
+set(BOOST_ROOT "D:/ClionProjects/FIIT_FA_SP_IK/vcpkg/installed/x64-windows")  # Укажите правильный путь
+set(BOOST_INCLUDEDIR "${BOOST_ROOT}/include")
+set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
 
 add_subdirectory(allocator)
 add_subdirectory(arithmetic)
