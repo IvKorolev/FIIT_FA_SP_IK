@@ -52,7 +52,8 @@ protected:
 
         virtual ~node() =default;
     };
-
+    friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
+    friend class binary_search_tree<tkey, tvalue, compare, tag>::node;
     inline bool compare_keys(const tkey& lhs, const tkey& rhs) const;
 
     inline bool compare_pairs(const value_type & lhs, const value_type & rhs) const;
@@ -284,6 +285,7 @@ public:
 
     class infix_iterator
     {
+        friend binary_search_tree<tkey, tvalue, compare>;
     protected:
 
         node* _data;
@@ -752,6 +754,8 @@ public:
 
     void clear() noexcept;
 
+    void clear(node *n);
+
     std::pair<infix_iterator, bool> insert(const value_type&);
     std::pair<infix_iterator, bool> insert(value_type&&);
 
@@ -928,11 +932,12 @@ namespace __detail
     template<typename tkey, typename tvalue, typename compare, typename tag>
     class bst_impl
     {
+        friend class binary_search_tree<tkey, tvalue, compare, tag>;
         template<class ...Args>
         static binary_search_tree<tkey, tvalue, compare, tag>::node* create_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, Args&& ...args);
 
         // Only calls destructor and frees memory
-        static void delete_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, binary_search_tree<tkey, tvalue, compare, tag>::node*);
+        static void delete_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, binary_search_tree<tkey, tvalue, compare, tag>::node** node);
 
         //Does not invalidate node*, needed for splay tree
         static void post_search(binary_search_tree<tkey, tvalue, compare, tag>::node**){}
@@ -951,20 +956,22 @@ template<typename tkey, typename tvalue, typename compare, typename tag>
 void __detail::bst_impl<tkey, tvalue, compare, tag>::swap(binary_search_tree<tkey, tvalue, compare, tag> &lhs,
                                                 binary_search_tree<tkey, tvalue, compare, tag> &rhs) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, typename compare, typename tag>\n"
-                          "void __detail::bst_impl<tkey, tvalue, compare, tag>::swap(binary_search_tree<tkey, tvalue, compare, tag> &lhs,\n"
-                          "binary_search_tree<tkey, tvalue, compare, tag> &rhs)", "your code should be here...");
+    using std::swap;
+    swap(lhs.root, rhs.root);
+    swap(lhs._logger, rhs._logger);
+    swap(lhs._size, rhs._size);
+    swap(lhs._allocator, rhs._allocator);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 template<input_iterator_for_pair<tkey, tvalue> iterator>
 binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(iterator begin, iterator end, const compare &cmp,
-                                                                   pp_allocator<typename binary_search_tree<tkey, tvalue, compare, tag>::value_type> alloc, logger *logger)
+                                                                   pp_allocator<typename binary_search_tree<tkey, tvalue, compare, tag>::value_type> alloc, logger *logger) : compare(cmp), _root(nullptr), _logger(logger), _size(0), _allocator(alloc)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>\n"
-                          "template<input_iterator_for_pair<tkey, tvalue> iterator>\n"
-                          "binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(iterator , iterator , const compare &,\n"
-                          "pp_allocator<typename binary_search_tree<tkey, tvalue, compare, tag>::value_type> , logger *)", "your code should be here...");
+    for (auto it = begin; it != end; ++it)
+    {
+        emplace(it->first, it->second);
+    }
 }
 
 
@@ -972,16 +979,13 @@ template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::compare_pairs(const binary_search_tree::value_type &lhs,
                                                               const binary_search_tree::value_type &rhs) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>\n"
-                          "bool binary_search_tree<tkey, tvalue, compare, tag>::compare_pairs(const binary_search_tree::value_type &,\n"
-                          "const binary_search_tree::value_type &) const", "your code should be here...");
+    return compare_keys(lhs.first, rhs.first);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::compare_keys(const tkey &lhs, const tkey &rhs) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>\n"
-                          "bool binary_search_tree<tkey, tvalue, compare, tag>::compare_keys(const tkey &, const tkey &) const", "your code should be here...");
+    return compare::operator()(lhs, rhs);
 }
 
 template<typename compare, typename U, typename iterator>
@@ -1004,9 +1008,8 @@ binary_search_tree(std::initializer_list<std::pair<tkey, tvalue>> data, const co
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 template<class ...Args>
-binary_search_tree<tkey, tvalue, compare, tag>::node::node(node* parent, Args&& ...args)
+binary_search_tree<tkey, tvalue, compare, tag>::node::node(node* parent, Args&& ...args) : data(std::forward<Args>(args)...), parent(parent), left_subtree(nullptr), right_subtree(nullptr)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<class ...Args> binary_search_tree<tkey, tvalue, compare, tag>::node::node(node* , Args&& ...args)", "your code should be here...");
 }
 
 // endregion node implementation
@@ -1446,7 +1449,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::infix_iterator(n
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator==(infix_iterator const &other) const noexcept
 {
-    return _data == &other._data;
+    return _data == other._data;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
@@ -1981,7 +1984,7 @@ size_t binary_search_tree<tkey, tvalue, compare, tag>::postfix_iterator::depth()
 // region postfix_const_iterator implementation
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_iterator::postfix_const_iterator(const node* data, const node* backup) : _base(const_cast<node*>(data), const_casst<node*>(backup))
+binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_iterator::postfix_const_iterator(const node* data, const node* backup) : _base(const_cast<node*>(data), const_cast<node*>(backup))
 {
 }
 
@@ -2053,7 +2056,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_iterator::operator
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 size_t binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_iterator::depth() const noexcept
 {
-    return _base().depth();
+    return _base.depth();
 }
 
 // endregion postfix_const_iterator implementation
@@ -2068,7 +2071,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::postfix_reverse_iterator::postfi
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 binary_search_tree<tkey, tvalue, compare, tag>::postfix_reverse_iterator::postfix_reverse_iterator(const postfix_iterator& it) noexcept : _base(it)
 {
-    return --_base;
+    --_base;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
@@ -2164,7 +2167,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_reverse_iterator::
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_reverse_iterator::postfix_const_reverse_iterator(const postfix_const_iterator& it) noexcept : _base(it)
 {
-    return --_base;
+    --_base;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
@@ -2252,128 +2255,245 @@ size_t binary_search_tree<tkey, tvalue, compare, tag>::postfix_const_reverse_ite
 
 // region binary_search_tree implementation
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(
-        const compare& comp,
-        pp_allocator<value_type> alloc,
-        logger *logger)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(const compare &comp, pp_allocator<value_type> alloc,
+                                                                   logger *logger)
+    : compare(comp), _allocator(alloc), _logger(logger), _root(nullptr)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(const compare& ,pp_allocator<value_type> ,logger *)", "your code should be here...");
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(
-        pp_allocator<value_type> alloc,
-        const compare& comp,
-        logger *logger)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(pp_allocator<value_type> alloc, const compare &comp,
+                                                                   logger *logger)
+    : compare(comp), _allocator(alloc), _logger(logger), _root(nullptr)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(pp_allocator<value_type> , const compare& , logger *)", "your code should be here...");
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-template<std::ranges::input_range Range>
-binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(
-        Range&& range,
-        const compare& cmp,
-        pp_allocator<value_type> alloc,
-        logger* logger)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <std::ranges::input_range Range>
+binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(Range &&range, const compare &cmp,
+                                                                   pp_allocator<value_type> alloc, logger *logger)
+    : compare(cmp), _allocator(alloc), _logger(logger), _root(nullptr)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<std::ranges::input_range Range> binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(Range&& ,const compare& ,pp_allocator<value_type> ,logger* )", "your code should be here...");
+    for (auto &&element : range)
+    {
+        emplace(std::forward<decltype(element)>(element));
+    }
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(
-        std::initializer_list<std::pair<tkey, tvalue>> data,
-        const compare& cmp,
-        pp_allocator<value_type> alloc,
-        logger* logger)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(std::initializer_list<std::pair<tkey, tvalue>> data,
+                                                                   const compare &cmp, pp_allocator<value_type> alloc,
+                                                                   logger *logger)
+    : compare(cmp), _allocator(alloc), _logger(logger), _root(nullptr)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(std::initializer_list<std::pair<tkey, tvalue>> ,const compare& ,pp_allocator<value_type> ,logger* )", "your code should be here...");
+    for (const auto &element : data)
+    {
+        emplace(element.first, element.second);
+    }
 }
 
 // endregion binary_search_tree implementation
 
+
 // region binary_search_tree 5_rules implementation
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(const binary_search_tree &other)
+    : compare(other.compare), _logger(other._logger), _allocator(other._allocator)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(const binary_search_tree &)", "your code should be here...");
+    if (other._root)
+    {
+        _root = _allocator.template new_object<node>(nullptr, other._root->data);
+        for (auto it = other.begin(); it != other.end(); ++it)
+        {
+            if (it != other.begin())
+            {
+                emplace(it->first, it->second);
+            }
+        }
+    }
+    else
+    {
+        _root = nullptr;
+    }
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(binary_search_tree &&other) noexcept
+    : compare(std::move(other)), _root(other._root), _logger(other._logger), _allocator(std::move(other._allocator)),
+      _size(other._size)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>::binary_search_tree(binary_search_tree &&) noexcept", "your code should be here...");
+    other._root = nullptr;
+    other._logger = nullptr;
+    other._size = 0;
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>&
-binary_search_tree<tkey, tvalue, compare, tag>::operator=(const binary_search_tree &other)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+binary_search_tree<tkey, tvalue, compare, tag> &binary_search_tree<tkey, tvalue, compare, tag>::operator=(
+    const binary_search_tree &other)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>& binary_search_tree<tkey, tvalue, compare, tag>::operator=(const binary_search_tree &)", "your code should be here...");
+    if (this != &other)
+    {
+        binary_search_tree temp(other);
+        __detail::bst_impl<tkey, tvalue, compare, tag>::swap(*this, temp);
+    }
+    return *this;
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-binary_search_tree<tkey, tvalue, compare, tag>&
-binary_search_tree<tkey, tvalue, compare, tag>::operator=(binary_search_tree &&other) noexcept
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+binary_search_tree<tkey, tvalue, compare, tag> &binary_search_tree<tkey, tvalue, compare, tag>::operator=(
+    binary_search_tree &&other) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>& binary_search_tree<tkey, tvalue, compare, tag>::operator=(binary_search_tree &&) noexcept", "your code should be here...");
+    if (this != &other)
+    {
+        __detail::bst_impl<tkey, tvalue, compare, tag>::swap(*this, other);
+    }
+    return *this;
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 binary_search_tree<tkey, tvalue, compare, tag>::~binary_search_tree()
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> binary_search_tree<tkey, tvalue, compare, tag>::~binary_search_tree()", "your code should be here...");
+    clear(_root);
 }
 
 // endregion binary_search_tree 5_rules implementation
 
+
 // region binary_search_tree methods_access implementation
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-tvalue& binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey& key)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+tvalue &binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey &key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> tvalue& binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey&)", "your code should be here...");
+    node *current = _root;
+    while (current != nullptr)
+    {
+        if (compare_keys(key, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, key))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            return current->data.second;
+        }
+    }
+    throw std::out_of_range("Key not found");
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-const tvalue& binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey& key) const
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+const tvalue &binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey &key) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> const tvalue& binary_search_tree<tkey, tvalue, compare, tag>::at(const tkey&) const", "your code should be here...");
+    const node *current = _root;
+    while (current != nullptr)
+    {
+        if (compare_keys(key, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, key))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            return current->data.second;
+        }
+    }
+    throw std::out_of_range("Key not found");
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-tvalue& binary_search_tree<tkey, tvalue, compare, tag>::operator[](const tkey& key)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+tvalue &binary_search_tree<tkey, tvalue, compare, tag>::operator[](const tkey &key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> tvalue& binary_search_tree<tkey, tvalue, compare, tag>::operator[](const tkey&)", "your code should be here...");
+    {
+        node *current = _root;
+        node *parent = nullptr;
+
+        while (current != nullptr)
+        {
+            if (compare_keys(key, current->data.first))
+            {
+                parent = current;
+                current = current->left_subtree;
+            }
+            else if (compare_keys(current->data.first, key))
+            {
+                parent = current;
+                current = current->right_subtree;
+            }
+            else
+            {
+                return current->data.second; // found
+            }
+        }
+
+        // not found
+        throw std::out_of_range("Key not found");
+    }
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-tvalue& binary_search_tree<tkey, tvalue, compare, tag>::operator[](tkey&& key)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+tvalue &binary_search_tree<tkey, tvalue, compare, tag>::operator[](tkey &&key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> tvalue& binary_search_tree<tkey, tvalue, compare, tag>::operator[](tkey&&)", "your code should be here...");
+    node *current = _root;
+    node *parent = nullptr;
+
+    while (current != nullptr)
+    {
+        if (compare_keys(key, current->data.first))
+        {
+            parent = current;
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, key))
+        {
+            parent = current;
+            current = current->right_subtree;
+        }
+        else
+        {
+            return current->data.second; // Ключ найден, возвращаем значение
+        }
+    }
+    throw std::out_of_range("Key not found");
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::empty() const noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> bool binary_search_tree<tkey, tvalue, compare, tag>::empty() const noexcept", "your code should be here...");
+    return _root == nullptr;
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 size_t binary_search_tree<tkey, tvalue, compare, tag>::size() const noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> size_t binary_search_tree<tkey, tvalue, compare, tag>::size() const noexcept", "your code should be here...");
+    return this->_size;
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::clear() noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::clear() noexcept", "your code should be here...");
+    clear(_root);
+}
+
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+void binary_search_tree<tkey, tvalue, compare, tag>::clear(node *n)
+{
+    if (n != nullptr)
+    {
+        clear(n->left_subtree);
+        clear(n->right_subtree);
+        _allocator.delete_object(n);
+    }
 }
 
 // endregion binary_search_tree methods_access implementation
+
 
 // region binary_search_tree methods_insert and methods_emplace implementation
 
@@ -2381,65 +2501,328 @@ template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool>
 binary_search_tree<tkey, tvalue, compare, tag>::insert(const value_type& value)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool> binary_search_tree<tkey, tvalue, compare, tag>::insert(const value_type&)", "your code should be here...");
+    node* current = _root;
+    node* parent = nullptr;
+
+    // Поиск подходящего места для вставки
+    while (current != nullptr)
+    {
+        parent = current;
+        if (compare_keys(value.first, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, value.first))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            // Ключ уже существует
+            return std::make_pair(infix_iterator(current), false);
+        }
+    }
+
+    // Создание нового узла
+    node* new_node = __detail::bst_impl<tkey, tvalue, compare, tag>::create_node(*this, parent, value);
+
+    // Установка нового узла в дерево
+    if (parent == nullptr)
+    {
+        _root = new_node; // Дерево было пустым
+    }
+    else if (compare_keys(new_node->data.first, parent->data.first))
+    {
+        parent->left_subtree = new_node;
+    }
+    else
+    {
+        parent->right_subtree = new_node;
+    }
+
+    ++_size; // Увеличение размера дерева
+
+    if (_logger)
+    {
+        _logger->log("Successfully inserted new node", logger::severity::debug);
+    }
+
+    return std::make_pair(infix_iterator(new_node), true);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool>
 binary_search_tree<tkey, tvalue, compare, tag>::insert(value_type&& value)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool> binary_search_tree<tkey, tvalue, compare, tag>::insert(value_type&&)", "your code should be here...");
+    node* current = _root;
+    node* parent = nullptr;
+
+    // Поиск подходящего места для вставки
+    while (current != nullptr)
+    {
+        parent = current;
+        if (compare_keys(value.first, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, value.first))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            // Ключ уже существует
+            return std::make_pair(infix_iterator(current), false);
+        }
+    }
+
+    // Создание нового узла с использованием перемещающего конструктора
+    node* new_node = __detail::bst_impl<tkey, tvalue, compare, tag>::create_node(*this, parent, std::move(value));
+
+    // Установка нового узла в дерево
+    if (parent == nullptr)
+    {
+        _root = new_node; // Дерево было пустым
+    }
+    else if (compare_keys(new_node->data.first, parent->data.first))
+    {
+        parent->left_subtree = new_node;
+    }
+    else
+    {
+        parent->right_subtree = new_node;
+    }
+
+    ++_size; // Увеличение размера дерева
+
+    if (_logger)
+    {
+        _logger->log("Successfully inserted new node with move semantics", logger::severity::debug);
+    }
+
+    return std::make_pair(infix_iterator(new_node), true);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 template<std::input_iterator InputIt>
 void binary_search_tree<tkey, tvalue, compare, tag>::insert(InputIt first, InputIt last)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<std::input_iterator InputIt> void binary_search_tree<tkey, tvalue, compare, tag>::insert(InputIt, InputIt)", "your code should be here...");
+    for (auto it = first; it != last; ++it)
+    {
+        insert(*it); // Вставляем каждый элемент из диапазона
+    }
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 template<std::ranges::input_range R>
 void binary_search_tree<tkey, tvalue, compare, tag>::insert_range(R&& rg)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<std::ranges::input_range R> void binary_search_tree<tkey, tvalue, compare, tag>::insert_range(R&&)", "your code should be here...");
+    for (auto&& element : rg)
+    {
+        insert(std::forward<decltype(element)>(element)); // Вставляем каждый элемент из диапазона
+    }
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-template<class ...Args>
-std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool>
-binary_search_tree<tkey, tvalue, compare, tag>::emplace(Args&&... args)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <class... Args>
+std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool> binary_search_tree<
+    tkey, tvalue, compare, tag>::emplace(Args &&...args)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<class ...Args> std::pair<typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator, bool> binary_search_tree<tkey, tvalue, compare, tag>::emplace(Args&&... args)", "your code should be here...");
+    value_type value(std::forward<Args>(args)...);
+    return insert(value);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(const value_type& value)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(const value_type& value)", "your code should be here...");
+    node* current = _root;
+    node* parent = nullptr;
+
+    // Поиск узла с таким же ключом или подходящего места для вставки
+    while (current != nullptr)
+    {
+        parent = current;
+        if (compare_keys(value.first, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, value.first))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            // Ключ найден, обновляем значение
+            current->data.second = value.second;
+            return infix_iterator(current);
+        }
+    }
+
+    // Создание нового узла
+    node* new_node = __detail::bst_impl<tkey, tvalue, compare, tag>::create_node(*this, parent, value);
+
+    // Установка нового узла в дерево
+    if (parent == nullptr)
+    {
+        _root = new_node; // Дерево было пустым
+    }
+    else if (compare_keys(new_node->data.first, parent->data.first))
+    {
+        parent->left_subtree = new_node;
+    }
+    else
+    {
+        parent->right_subtree = new_node;
+    }
+
+    ++_size; // Увеличение размера дерева
+
+    if (_logger)
+    {
+        _logger->log("Inserted or assigned new node", logger::severity::debug);
+    }
+
+    return infix_iterator(new_node);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(value_type&& value)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(value_type&& value)", "your code should be here...");
+    node* current = _root;
+    node* parent = nullptr;
+
+    // Поиск узла с таким же ключом или подходящего места для вставки
+    while (current != nullptr)
+    {
+        parent = current;
+        if (compare_keys(value.first, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, value.first))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            // Ключ найден, обновляем значение
+            current->data.second = std::move(value.second);
+            return infix_iterator(current);
+        }
+    }
+
+    // Создание нового узла с использованием перемещающего конструктора
+    node* new_node = __detail::bst_impl<tkey, tvalue, compare, tag>::create_node(*this, parent, std::move(value));
+
+    // Установка нового узла в дерево
+    if (parent == nullptr)
+    {
+        _root = new_node; // Дерево было пустым
+    }
+    else if (compare_keys(new_node->data.first, parent->data.first))
+    {
+        parent->left_subtree = new_node;
+    }
+    else
+    {
+        parent->right_subtree = new_node;
+    }
+
+    ++_size; // Увеличение размера дерева
+
+    if (_logger)
+    {
+        _logger->log("Inserted or assigned new node with move semantics", logger::severity::debug);
+    }
+
+    return infix_iterator(new_node);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 template<std::input_iterator InputIt>
 void binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(InputIt first, InputIt last)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<std::input_iterator InputIt> void binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(InputIt first, InputIt last)", "your code should be here...");
+    if (_logger)
+    {
+        _logger->log("Starting range insert_or_assign", logger::severity::debug);
+    }
+
+    for (auto it = first; it != last; ++it)
+    {
+        if constexpr (std::is_rvalue_reference_v<decltype(*it)>)
+        {
+            insert_or_assign(std::move(*it));
+        }
+        else
+        {
+            insert_or_assign(*it);
+        }
+    }
+
+    if (_logger)
+    {
+        _logger->log("Range insert_or_assign completed", logger::severity::debug);
+    }
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-template<class ...Args>
-typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::emplace_or_assign(Args&&... args)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+template <class... Args>
+typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<
+    tkey, tvalue, compare, tag>::emplace_or_assign(Args &&...args)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> template<class ...Args> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::emplace_or_assign(Args&&... args)", "your code should be here...");
+    // Создаём временный объект пары ключ-значение из переданных аргументов
+    value_type temp(std::forward<Args>(args)...);
+
+    node* current = _root;
+    node* parent = nullptr;
+
+    // Поиск узла с таким же ключом или подходящего места для вставки
+    while (current != nullptr)
+    {
+        parent = current;
+        if (compare_keys(temp.first, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare_keys(current->data.first, temp.first))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            // Ключ найден, обновляем значение
+            current->data.second = std::move(temp.second);
+            return infix_iterator(current);
+        }
+    }
+
+    // Создание нового узла
+    node* new_node = __detail::bst_impl<tkey, tvalue, compare, tag>::create_node(*this, parent, std::move(temp));
+
+    // Установка нового узла в дерево
+    if (parent == nullptr)
+    {
+        _root = new_node; // Дерево было пустым
+    }
+    else if (compare_keys(new_node->data.first, parent->data.first))
+    {
+        parent->left_subtree = new_node;
+    }
+    else
+    {
+        parent->right_subtree = new_node;
+    }
+
+    ++_size; // Увеличение размера дерева
+
+    if (_logger)
+    {
+        _logger->log("Emplaced or assigned new node", logger::severity::debug);
+    }
+
+    return infix_iterator(new_node);
 }
 
 // endregion binary_search_tree methods_insert and methods_emplace implementation
@@ -2449,7 +2832,40 @@ binary_search_tree<tkey, tvalue, compare, tag>::emplace_or_assign(Args&&... args
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::swap(binary_search_tree& other) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::swap(binary_search_tree&) noexcept", "your code should be here...");
+    if (this == &other)
+    {
+        return;
+    }
+
+    node* this_root = _root;
+    pp_allocator<value_type> this_alloc = _allocator;
+    logger* this_logger = _logger;
+
+    try {
+        _root = other._root;
+        _allocator = other._allocator;
+        _logger = other._logger;
+
+        other._root = this_root;
+        other._allocator = this_alloc;
+        other._logger = this_logger;
+
+        if (_logger)
+        {
+            _logger->log("Swapped trees (this)", logger::severity::debug);
+        }
+        if (other._logger)
+        {
+            other._logger->log("Swapped trees (other)", logger::severity::debug);
+        }
+    }
+    catch (...) {
+        _root = this_root;
+        _allocator = this_alloc;
+        _logger = this_logger;
+
+        std::terminate();
+    }
 }
 
 // endregion binary_search_tree swap_method implementation
@@ -2459,83 +2875,246 @@ void binary_search_tree<tkey, tvalue, compare, tag>::swap(binary_search_tree& ot
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::contains(const tkey& key) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> bool binary_search_tree<tkey, tvalue, compare, tag>::contains(const tkey&) const", "your code should be here...");
+    node* current = _root;
+    while (current != nullptr)
+    {
+        if (compare::operator()(key, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare::operator()(current->data.first, key))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::find(const tkey& key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::find(const tkey& )", "your code should be here...");
+    node* current = _root;
+    while (current != nullptr)
+    {
+        if (compare::operator()(key, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare::operator()(current->data.first, key))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            return infix_iterator(current);
+        }
+    }
+    return end();
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::find(const tkey& key) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator binary_search_tree<tkey, tvalue, compare, tag>::find(const tkey& key) const", "your code should be here...");
+    const node* current = _root;
+    while (current != nullptr)
+    {
+        if (compare::operator()(key, current->data.first))
+        {
+            current = current->left_subtree;
+        }
+        else if (compare::operator()(current->data.first, key))
+        {
+            current = current->right_subtree;
+        }
+        else
+        {
+            return infix_const_iterator(current);
+        }
+    }
+    return cend();
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::lower_bound(const tkey& key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::lower_bound(const tkey& key)", "your code should be here...");
+    node* current = _root;
+    node* result = nullptr;
+
+    while (current != nullptr)
+    {
+        if (!compare::operator()(current->data.first, key))
+        {
+            result = current;
+            current = current->left_subtree;
+        }
+        else
+        {
+            current = current->right_subtree;
+        }
+    }
+    return infix_iterator(result);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::lower_bound(const tkey& key) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator binary_search_tree<tkey, tvalue, compare, tag>::lower_bound(const tkey& key) const", "your code should be here...");
+    node* current = _root;
+    node* result = nullptr;
+
+    while (current != nullptr)
+    {
+        if (!compare::operator()(current->data.first, key))
+        {
+            result = current;
+            current = current->left_subtree;
+        }
+        else
+        {
+            current = current->right_subtree;
+        }
+    }
+    return infix_const_iterator(result);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::upper_bound(const tkey& key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::upper_bound(const tkey& key)", "your code should be here...");
+    node* current = _root;
+    node* result = nullptr;
+
+    while (current != nullptr)
+    {
+        if (compare::operator()(key, current->data.first))
+        {
+            result = current;
+            current = current->left_subtree;
+        }
+        else
+        {
+            current = current->right_subtree;
+        }
+    }
+    return infix_iterator(result);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator
 binary_search_tree<tkey, tvalue, compare, tag>::upper_bound(const tkey& key) const
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator binary_search_tree<tkey, tvalue, compare, tag>::upper_bound(const tkey& key) const", "your code should be here...");
+    node* current = _root;
+    node* result = nullptr;
+
+    while (current != nullptr)
+    {
+        if (compare::operator()(key, current->data.first))
+        {
+            result = current;
+            current = current->left_subtree;
+        }
+        else
+        {
+            current = current->right_subtree;
+        }
+    }
+    return infix_const_iterator(result);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_iterator pos)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<
+    tkey, tvalue, compare, tag>::erase(infix_iterator pos)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_iterator pos)", "your code should be here...");
+    if (pos == end())
+    {
+        return end();
+    }
+
+    auto to_delete = pos;
+    node *target = pos._data;
+    node *next = nullptr;
+
+    auto next_temp = ++pos;
+
+    if (target->right_subtree)
+    {
+        next = target->right_subtree;
+        while (next->left_subtree)
+        {
+            next = next->left_subtree;
+        }
+    }
+    else
+    {
+        node *parent = target->parent;
+        while (parent && target == parent->right_subtree)
+        {
+            target = parent;
+            parent = parent->parent;
+        }
+        next = parent;
+    }
+
+    __detail::bst_impl<tkey, tvalue, compare, tag>::erase(*this, &to_delete._data);
+
+    auto iter = infix_iterator(next);
+
+    return infix_iterator(next);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_const_iterator pos)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<
+    tkey, tvalue, compare, tag>::erase(infix_const_iterator pos)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_const_iterator pos)", "your code should be here...");
+    if (pos == end())
+    {
+        throw std::out_of_range("Iterator out of range");
+    }
+    return __detail::bst_impl<tkey, tvalue, compare, tag>::erase(*this, &pos._base._data);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_iterator first, infix_iterator last)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<
+    tkey, tvalue, compare, tag>::erase(infix_iterator first, infix_iterator last)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_iterator first, infix_iterator last)", "your code should be here...");
+    auto it = first;
+    while (it != last)
+    {
+        it = erase(it);
+    }
+    return infix_iterator(it._base._data);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_const_iterator first, infix_const_iterator last)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<
+    tkey, tvalue, compare, tag>::erase(infix_const_iterator first, infix_const_iterator last)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_search_tree<tkey, tvalue, compare, tag>::erase(infix_const_iterator first, infix_const_iterator last)", "your code should be here...");
+    auto it = first;
+    while (it != last)
+    {
+        it = erase(it);
+    }
+    return infix_iterator(it._base._data);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
-size_t binary_search_tree<tkey, tvalue, compare, tag>::erase(const tkey& key)
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+size_t binary_search_tree<tkey, tvalue, compare, tag>::erase(const tkey &key)
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> size_t binary_search_tree<tkey, tvalue, compare, tag>::erase(const tkey& key)", "your code should be here...");
+
+    auto it = find(key);
+    if (it == end())
+    {
+        return 0;
+    }
+    erase(it);
+    return 1;
 }
 
 // endregion binary_search_tree methods_search and methods_erase implementation
@@ -3091,37 +3670,117 @@ binary_search_tree<tkey, tvalue, compare, tag>::crend_postfix() const noexcept
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::small_left_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::small_left_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->right_subtree == nullptr)
+    {
+        return; // Невозможно выполнить малый левый поворот
+    }
+
+    node* new_root = subtree_root->right_subtree;
+    subtree_root->right_subtree = new_root->left_subtree;
+    if (new_root->left_subtree != nullptr)
+    {
+        new_root->left_subtree->parent = subtree_root;
+    }
+
+    new_root->parent = subtree_root->parent;
+
+    if (subtree_root->parent)
+    {
+        if (subtree_root == subtree_root->parent->left_subtree) // обновляем ссылку родителя старого узла
+        {
+            subtree_root->parent->left_subtree = new_root;
+        }
+        else if (subtree_root == subtree_root->parent->right_subtree)
+        {
+            subtree_root->parent->right_subtree = new_root;
+        }
+    }
+
+    new_root->left_subtree = subtree_root;
+    subtree_root->parent = new_root;
+
+    subtree_root = new_root;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::small_right_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::small_right_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->left_subtree == nullptr)
+    {
+        return;
+    }
+
+    node* new_root = subtree_root->left_subtree;
+    subtree_root->left_subtree = new_root->right_subtree;
+    if (new_root->right_subtree != nullptr)
+    {
+        new_root->right_subtree->parent = subtree_root;
+    }
+
+    if (subtree_root->parent)
+    {
+        if (subtree_root == subtree_root->parent->left_subtree) // обновляем ссылку родителя старого узла
+        {
+            subtree_root->parent->left_subtree = new_root;
+        }
+        else if (subtree_root == subtree_root->parent->right_subtree)
+        {
+            subtree_root->parent->right_subtree = new_root;
+        }
+    }
+
+
+    new_root->right_subtree = subtree_root;
+    subtree_root->parent = new_root;
+
+    subtree_root = new_root;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::big_left_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::big_left_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->right_subtree == nullptr || subtree_root->right_subtree->left_subtree == nullptr)
+    {
+        return;
+    }
+
+    small_right_rotation(subtree_root->right_subtree);
+    small_left_rotation(subtree_root);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::big_right_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::big_right_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->left_subtree == nullptr || subtree_root->left_subtree->right_subtree == nullptr)
+    {
+        return;
+    }
+
+    small_left_rotation(subtree_root->left_subtree);
+    small_right_rotation(subtree_root);
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::double_left_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::double_left_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->left_subtree == nullptr)
+    {
+        return;
+    }
+    small_left_rotation(subtree_root->left_subtree);
+    small_left_rotation(subtree_root);
 }
 
-template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
+
+template <typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::double_right_rotation(node *&subtree_root) noexcept
 {
-    throw not_implemented("template<typename tkey, typename tvalue, compator<tkey> compare, typename tag> void binary_search_tree<tkey, tvalue, compare, tag>::double_right_rotation(node *&subtree_root) noexcept", "your code should be here...");
+    if (subtree_root == nullptr || subtree_root->right_subtree == nullptr)
+    {
+        return;
+    }
+    small_right_rotation(subtree_root->right_subtree);
+    small_right_rotation(subtree_root);
 }
 
 //endregion subtree rotations implementation
@@ -3132,25 +3791,94 @@ namespace __detail {
     typename binary_search_tree<tkey, tvalue, compare, tag>::node*
     bst_impl<tkey, tvalue, compare, tag>::create_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, Args&& ...args)
     {
-
-        throw not_implemented("template<typename tkey, typename tvalue, typename compare, typename tag>\n"
-                              " template<typename ...Args>\n"
-                              "typename binary_search_tree<tkey, tvalue, compare, tag>::node*\n"
-                              "bst_impl<tkey, tvalue, compare, tag>::create_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, Args&& ...args)", "your code should be here...");
+        using node_type = typename binary_search_tree<tkey, tvalue, compare, tag>::node;
+        auto *new_node = cont._allocator.template new_object<node_type>(std::forward<Args>(args)...);
+        return new_node;
     }
 
     template<typename tkey, typename tvalue, typename compare, typename tag>
-    void bst_impl<tkey, tvalue, compare, tag>::delete_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, binary_search_tree<tkey, tvalue, compare, tag>::node*)
+    void bst_impl<tkey, tvalue, compare, tag>::delete_node(binary_search_tree<tkey, tvalue, compare, tag>& cont, binary_search_tree<tkey, tvalue, compare, tag>::node** node)
     {
-
-        throw not_implemented("template<typename tkey, typename tvalue, typename compare, typename tag> void bst_impl<tkey, tvalue, compare, tag>::delete_node(binary_search_tree<tkey, tvalue, compare, tag>& cont)", "your code should be here...");
+        using node_type = typename binary_search_tree<tkey, tvalue, compare, tag>::node;
+        if (node && *node)
+        {
+            cont._allocator.template delete_object<node_type>(*node);
+            *node = nullptr;
+        }
     }
 
     template<typename tkey, typename tvalue, typename compare, typename tag>
     void bst_impl<tkey, tvalue, compare, tag>::erase(binary_search_tree<tkey, tvalue, compare, tag>& cont, typename binary_search_tree<tkey, tvalue, compare, tag>::node** node_ptr)
     {
+        using node_type = typename binary_search_tree<tkey, tvalue, compare, tag>::node;
+        node_type* node = *node_ptr;
 
-        throw not_implemented("template<typename tkey, typename tvalue, typename compare, typename tag> void bst_impl<tkey, tvalue, compare, tag>::erase(binary_search_tree<tkey, tvalue, compare, tag>& cont, typename binary_search_tree<tkey, tvalue, compare, tag>::node** node_ptr)", "your code should be here...");
+        if (!node) return;
+
+        // Определяем количество потомков
+        const bool has_left = node->left_subtree != nullptr;
+        const bool has_right = node->right_subtree != nullptr;
+
+        if (!has_left && !has_right)
+        {
+            // Случай 1: Лист
+            if (node->parent)
+            {
+                if (node->parent->left_subtree == node)
+                {
+                    node->parent->left_subtree = nullptr;
+                }
+                else
+                {
+                    node->parent->right_subtree = nullptr;
+                }
+            }
+            else
+            {
+                cont._root = nullptr; // Удаляем корень
+            }
+            delete_node(cont, node_ptr);
+        }
+        else if (has_left != has_right)
+        {
+            // Случай 2: Один потомок
+            node_type* child = has_left ? node->left_subtree : node->right_subtree;
+            child->parent = node->parent; // Обновляем родителя у потомка
+
+            if (node->parent)
+            {
+                if (node->parent->left_subtree == node)
+                {
+                    node->parent->left_subtree = child;
+                }
+                else
+                {
+                    node->parent->right_subtree = child;
+                }
+            }
+            else
+            {
+                cont._root = child; // Обновляем корень
+            }
+
+            delete_node(cont, node_ptr);
+            *node_ptr = child;
+        }
+        else
+        {
+            // Случай 3: Два потомка
+            node_type** successor_ptr = &(node->left_subtree);
+            while ((*successor_ptr)->right_subtree)
+            {
+                successor_ptr = &((*successor_ptr)->right_subtree);
+            }
+
+            // Обмен данными с преемником
+            std::swap(node->data.second, (*successor_ptr)->data.second);
+
+            // Рекурсивное удаление преемника
+            erase(cont, successor_ptr);
+        }
     }
 }
 
