@@ -29,7 +29,8 @@ class binary_search_tree : private compare
 {
 public:
 
-    using value_type = std::pair<const tkey, tvalue>;
+    //using value_type = std::pair<const tkey, tvalue>;
+    using value_type = std::pair<tkey, tvalue>; //???
 
     friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
 
@@ -3043,12 +3044,20 @@ typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_s
 
     auto next_temp = ++pos;
 
-    if (target->right_subtree)
+//    if (target->right_subtree)
+//    {
+//        next = target->right_subtree;
+//        while (next->left_subtree)
+//        {
+//            next = next->left_subtree;
+//        }
+//    }
+    if (target->left_subtree)
     {
-        next = target->right_subtree;
-        while (next->left_subtree)
+        next = target->left_subtree;
+        while (next->right_subtree)
         {
-            next = next->left_subtree;
+            next = next->right_subtree;
         }
     }
     else
@@ -3533,10 +3542,14 @@ binary_search_tree<tkey, tvalue, compare, tag>::begin_postfix() noexcept
     {
         return postfix_iterator(nullptr);
     }
+
     node* current = _root;
-    while (current->left_subtree != nullptr)
+    while (current->left_subtree != nullptr || current->right_subtree != nullptr)
     {
-        current = current->left_subtree;
+        if (current->left_subtree != nullptr)
+            current = current->left_subtree;
+        else
+            current = current->right_subtree;
     }
     return postfix_iterator(current);
 }
@@ -3560,10 +3573,14 @@ binary_search_tree<tkey, tvalue, compare, tag>::begin_postfix() const noexcept
     {
         return postfix_const_iterator(nullptr);
     }
+
     node* current = _root;
-    while (current->left_subtree != nullptr)
+    while (current->left_subtree != nullptr || current->right_subtree != nullptr)
     {
-        current = current->left_subtree;
+        if (current->left_subtree != nullptr)
+            current = current->left_subtree;
+        else
+            current = current->right_subtree;
     }
     return postfix_const_iterator(current);
 }
@@ -3874,7 +3891,8 @@ namespace __detail {
             }
 
             // Обмен данными с преемником
-            std::swap(node->data.second, (*successor_ptr)->data.second);
+            //std::swap(node->data.second, (*successor_ptr)->data.second);
+            std::swap(node->data, (*successor_ptr)->data);
 
             // Рекурсивное удаление преемника
             erase(cont, successor_ptr);
