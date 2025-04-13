@@ -29,8 +29,8 @@ class binary_search_tree : private compare
 {
 public:
 
-    //using value_type = std::pair<const tkey, tvalue>;
-    using value_type = std::pair<tkey, tvalue>; //???
+    using value_type = std::pair<const tkey, tvalue>;
+    //using value_type = std::pair<tkey, tvalue>; //???
 
     friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
 
@@ -3883,19 +3883,48 @@ namespace __detail {
         }
         else
         {
-            // Случай 3: Два потомка
             node_type** successor_ptr = &(node->left_subtree);
             while ((*successor_ptr)->right_subtree)
             {
                 successor_ptr = &((*successor_ptr)->right_subtree);
             }
 
-            // Обмен данными с преемником
-            //std::swap(node->data.second, (*successor_ptr)->data.second);
-            std::swap(node->data, (*successor_ptr)->data);
+            node_type* successor = *successor_ptr;
 
-            // Рекурсивное удаление преемника
-            erase(cont, successor_ptr);
+            // Удаляем successor из его текущего положения
+            if (successor->parent->left_subtree == successor)
+                successor->parent->left_subtree = successor->right_subtree;
+            else
+                successor->parent->right_subtree = successor->right_subtree;
+
+            if (successor->right_subtree)
+                successor->right_subtree->parent = successor->parent;
+
+            // Подставляем successor вместо удаляемого узла
+            successor->left_subtree = node->left_subtree;
+            if (successor->left_subtree)
+                successor->left_subtree->parent = successor;
+
+            successor->right_subtree = node->right_subtree;
+            if (successor->right_subtree)
+                successor->right_subtree->parent = successor;
+
+            successor->parent = node->parent;
+
+            if (node->parent)
+            {
+                if (node->parent->left_subtree == node)
+                    node->parent->left_subtree = successor;
+                else
+                    node->parent->right_subtree = successor;
+            }
+            else
+            {
+                cont._root = successor;
+            }
+
+            delete_node(cont, node_ptr);
+            *node_ptr = successor;
         }
     }
 }
