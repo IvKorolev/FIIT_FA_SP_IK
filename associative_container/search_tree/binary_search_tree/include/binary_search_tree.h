@@ -30,7 +30,6 @@ class binary_search_tree : private compare
 public:
 
     using value_type = std::pair<const tkey, tvalue>;
-    //using value_type = std::pair<tkey, tvalue>; //???
 
     friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
 
@@ -286,7 +285,8 @@ public:
 
     class infix_iterator
     {
-        friend binary_search_tree<tkey, tvalue, compare>;
+        friend class binary_search_tree;
+        friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
     protected:
 
         node* _data;
@@ -295,6 +295,7 @@ public:
          *
          */
         node* _backup;
+
 
     public:
 
@@ -1456,7 +1457,7 @@ bool binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator==(
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 bool binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator!=(infix_iterator const &other) const noexcept
 {
-    return _data != &other._data;
+    return _data != other._data;
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
@@ -2548,6 +2549,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::insert(const value_type& value)
         _logger->log("Successfully inserted new node", logger::severity::debug);
     }
 
+    __detail::bst_impl<tkey, tvalue, compare, tag>::post_insert(*this, &new_node);
     return std::make_pair(infix_iterator(new_node), true);
 }
 
@@ -2600,7 +2602,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::insert(value_type&& value)
     {
         _logger->log("Successfully inserted new node with move semantics", logger::severity::debug);
     }
-
+    __detail::bst_impl<tkey, tvalue, compare, tag>::post_insert(*this, &new_node);
     return std::make_pair(infix_iterator(new_node), true);
 }
 
@@ -2683,7 +2685,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(const value_typ
     {
         _logger->log("Inserted or assigned new node", logger::severity::debug);
     }
-
+    __detail::bst_impl<tkey, tvalue, compare, tag>::post_insert(*this, &new_node);
     return infix_iterator(new_node);
 }
 
@@ -2737,7 +2739,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::insert_or_assign(value_type&& va
     {
         _logger->log("Inserted or assigned new node with move semantics", logger::severity::debug);
     }
-
+    __detail::bst_impl<tkey, tvalue, compare, tag>::post_insert(*this, &new_node);
     return infix_iterator(new_node);
 }
 
@@ -2822,7 +2824,7 @@ typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_s
     {
         _logger->log("Emplaced or assigned new node", logger::severity::debug);
     }
-
+    __detail::bst_impl<tkey, tvalue, compare, tag>::post_insert(*this, &new_node);
     return infix_iterator(new_node);
 }
 
@@ -3044,14 +3046,6 @@ typename binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator binary_s
 
     auto next_temp = ++pos;
 
-//    if (target->right_subtree)
-//    {
-//        next = target->right_subtree;
-//        while (next->left_subtree)
-//        {
-//            next = next->left_subtree;
-//        }
-//    }
     if (target->left_subtree)
     {
         next = target->left_subtree;
@@ -3168,7 +3162,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::end() noexcept
 
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 typename binary_search_tree<tkey, tvalue, compare, tag>::infix_const_iterator
-binary_search_tree<tkey, tvalue, compare, tag>::begin() const noexcept
+binary_search_tree<tkey, tvalue, compare, tag>:: begin() const noexcept
 {
     if (_root == nullptr)
     {
@@ -3687,38 +3681,37 @@ binary_search_tree<tkey, tvalue, compare, tag>::crend_postfix() const noexcept
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::small_left_rotation(node *&subtree_root) noexcept
 {
-    if (subtree_root == nullptr || subtree_root->right_subtree == nullptr)
-    {
-        return; // Невозможно выполнить малый левый поворот
+    if (subtree_root == nullptr || subtree_root->right_subtree == nullptr) {
+        return;
     }
 
     node* new_root = subtree_root->right_subtree;
     subtree_root->right_subtree = new_root->left_subtree;
-    if (new_root->left_subtree != nullptr)
-    {
+
+    if (new_root->left_subtree != nullptr) {
         new_root->left_subtree->parent = subtree_root;
     }
 
-    new_root->parent = subtree_root->parent;
+    // Сохраняем исходного родителя перед изменением
+    node* original_parent = subtree_root->parent;
 
-    if (subtree_root->parent)
-    {
-        if (subtree_root == subtree_root->parent->left_subtree) // обновляем ссылку родителя старого узла
-        {
-            subtree_root->parent->left_subtree = new_root;
-        }
-        else if (subtree_root == subtree_root->parent->right_subtree)
-        {
-            subtree_root->parent->right_subtree = new_root;
-        }
-    }
-
+    // Сначала опускаем старый корень
     new_root->left_subtree = subtree_root;
     subtree_root->parent = new_root;
 
+    // Затем обновляем родителя нового корня
+    new_root->parent = original_parent;
+
+    if (original_parent != nullptr) {
+        if (subtree_root == original_parent->left_subtree) {
+            original_parent->left_subtree = new_root;
+        } else {
+            original_parent->right_subtree = new_root;
+        }
+    }
+
     subtree_root = new_root;
 }
-
 template<typename tkey, typename tvalue, compator<tkey> compare, typename tag>
 void binary_search_tree<tkey, tvalue, compare, tag>::small_right_rotation(node *&subtree_root) noexcept
 {
@@ -3729,26 +3722,35 @@ void binary_search_tree<tkey, tvalue, compare, tag>::small_right_rotation(node *
 
     node* new_root = subtree_root->left_subtree;
     subtree_root->left_subtree = new_root->right_subtree;
+
+    // Обновляем родителя перенесенного поддерева
     if (new_root->right_subtree != nullptr)
     {
         new_root->right_subtree->parent = subtree_root;
     }
 
-    if (subtree_root->parent)
-    {
-        if (subtree_root == subtree_root->parent->left_subtree) // обновляем ссылку родителя старого узла
-        {
-            subtree_root->parent->left_subtree = new_root;
-        }
-        else if (subtree_root == subtree_root->parent->right_subtree)
-        {
-            subtree_root->parent->right_subtree = new_root;
-        }
-    }
+    // Сохраняем исходного родителя перед изменением
+    node* original_parent = subtree_root->parent;
 
-
+    // Поднимаем новый корень
     new_root->right_subtree = subtree_root;
     subtree_root->parent = new_root;
+
+    // Обновляем родителя нового корня
+    new_root->parent = original_parent;
+
+    // Обновляем ссылку у исходного родителя
+    if (original_parent != nullptr)
+    {
+        if (subtree_root == original_parent->left_subtree)
+        {
+            original_parent->left_subtree = new_root;
+        }
+        else
+        {
+            original_parent->right_subtree = new_root;
+        }
+    }
 
     subtree_root = new_root;
 }

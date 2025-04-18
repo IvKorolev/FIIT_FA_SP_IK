@@ -3,10 +3,13 @@ add_library(
         src/server_logger.cpp
         src/server_logger_builder.cpp)
 
+add_subdirectory(tests)
+
 target_include_directories(
         mp_os_lggr_srvr_lggr
         PUBLIC
-        ./include)
+        ./include
+        "D:/ClionProjects/FIIT_FA_SP_IK/vcpkg/installed/x64-windows/include")
 
 target_link_libraries(
         mp_os_lggr_srvr_lggr

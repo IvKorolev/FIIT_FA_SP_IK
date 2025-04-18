@@ -21,7 +21,7 @@ class server
 
 public:
 
-    explicit server(uint16_t port = 8080);
+    explicit server(uint16_t port = 9200);
 
     server(const server&) = delete;
     server& operator=(const server&) = delete;
