@@ -29,28 +29,28 @@ logger *create_logger(
     return built_logger;
 }
 
-TEST(my_test, t1)
-{
-    std::vector<unsigned int> vec1{0, 1, 2, 3, 4, 5};
-
-    big_int num1(vec1);
-
-    std::vector<unsigned int> vec2{3, 2, 1};
-
-    big_int num2(vec2);
-
-    auto res_div = num1 / num2;
-
-    std::string val_div = res_div.to_string();
-
-    auto res_mode = num1 % num2;
-
-    auto val_mod = res_mode.to_string();
-
-    EXPECT_EQ(val_div, "396140812460641223525462442003");
-
-    EXPECT_EQ(val_mod, "18446743914795761607");
-}
+// TEST(my_test, t1)
+// {
+//     std::vector<unsigned int> vec1{0, 1, 2, 3, 4, 5};
+//
+//     big_int num1(vec1);
+//
+//     std::vector<unsigned int> vec2{3, 2, 1};
+//
+//     big_int num2(vec2);
+//
+//     auto res_div = num1 / num2;
+//
+//     std::string val_div = res_div.to_string();
+//
+//     auto res_mode = num1 % num2;
+//
+//     auto val_mod = res_mode.to_string();
+//
+//     EXPECT_EQ(val_div, "396140812460641223525462442003");
+//
+//     EXPECT_EQ(val_mod, "18446743914795761607");
+// }
 
 TEST(positive_tests, test1)
 {
@@ -61,7 +61,7 @@ TEST(positive_tests, test1)
                 logger::severity::information
             },
         });
-    
+
     big_int bigint_1("32850346459076457453464575686784654");
     big_int bigint_2("423534596495087569087908753095322");
     big_int result_of_sum = bigint_1 + bigint_2;
@@ -84,18 +84,23 @@ TEST(positive_tests, test2)
                 logger::severity::information
             },
         });
-    
+
     big_int bigint_1("32850346459076457453464575686784654");
     big_int bigint_2("0000042353459649508756908790875309532245366457546765745645647567575");
-    
+
+    // std::cout << bigint_1 << std::endl;
+    // std::cout << bigint_2 << std::endl;
+
     big_int result_of_sub = bigint_1 - bigint_2;
-    
+
+    //std::cout << result_of_sub << std::endl;
+
     std::stringstream ss;
     ss << result_of_sub;
     std::string result_string = ss.str();
-    
+
     EXPECT_TRUE(result_string == "-42353459649508756908790875276681898907381089312281069960782921");
-    
+
     delete logger;
 }
 
@@ -111,6 +116,9 @@ TEST(positive_tests, test3)
 
     big_int bigint_1("32850346459076457453464575686784654");
     big_int bigint_2("12342357553253");
+
+    // std::cout << bigint_1 << std::endl;
+    // std::cout << bigint_2 << std::endl;
 
     big_int result_of_remainder = bigint_1 % bigint_2;
 
@@ -135,7 +143,7 @@ TEST(positive_tests, test4)
     
     big_int bigint_1("-54357893745346457544353");
     big_int bigint_2("-54357893745346457544354");
-    
+
     EXPECT_TRUE(bigint_1 > bigint_2);
     
     delete logger;

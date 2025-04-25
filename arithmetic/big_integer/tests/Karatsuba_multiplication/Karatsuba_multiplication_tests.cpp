@@ -121,7 +121,6 @@ TEST(positive_tests_kar, test5)
     big_int bigint_2("0");
     iss >> bigint_1 >> bigint_2;
     bigint_1 *= bigint_2;
-
     EXPECT_TRUE((std::ostringstream() << bigint_1).str() == "42118517249079582762848120969952324453639154832768688602860605975");
 
     delete logger;

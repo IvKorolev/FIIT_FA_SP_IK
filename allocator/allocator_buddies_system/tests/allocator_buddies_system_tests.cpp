@@ -38,7 +38,7 @@ TEST(positiveTests, test1)
             }
         }));
     std::unique_ptr<smart_mem_resource> allocator_instance(new allocator_buddies_system(12, nullptr, logger_instance.get(), allocator_with_fit_mode::fit_mode::first_fit));
-    
+
     auto actual_blocks_state = dynamic_cast<allocator_test_utils *>(allocator_instance.get())->get_blocks_info();
     std::vector<allocator_test_utils::block_info> expected_blocks_state
         {
@@ -100,6 +100,106 @@ TEST(positiveTests, test3)
     allocator_instance->deallocate(second_block, 1);
 }
 
+// TEST(positiveTests, test53)
+// {
+//     std::unique_ptr<logger> logger_instance(create_logger(std::vector<std::pair<std::string, logger::severity>>
+//                                                     {
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::information
+//                                                             },
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::debug
+//                                                             },
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::trace
+//                                                             },
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::warning
+//                                                             },
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::error
+//                                                             },
+//                                                             {
+//                                                                     "a.txt",
+//                                                                     logger::severity::critical
+//                                                             }
+//                                                     }));
+//
+//     std::unique_ptr<smart_mem_resource> alloc(new allocator_buddies_system(12, nullptr, logger_instance.get(),
+//                                                                allocator_with_fit_mode::fit_mode::first_fit));
+//
+//     auto first_block = reinterpret_cast<int *>(alloc->allocate(sizeof(int) * 250));
+//     auto second_block = reinterpret_cast<char *>(alloc->allocate(sizeof(char) * 500));
+//     auto third_block = reinterpret_cast<double *>(alloc->allocate(sizeof(double *) * 250));
+//     alloc->deallocate(first_block, 1);
+//     first_block = reinterpret_cast<int *>(alloc->allocate(sizeof(int) * 245));
+//
+//     std::unique_ptr<smart_mem_resource> allocator(new allocator_buddies_system(13, nullptr, logger_instance.get(),
+//                                                                    allocator_with_fit_mode::fit_mode::first_fit));
+//     auto *the_same_subject = dynamic_cast<allocator_with_fit_mode *>(allocator.get());
+//     int iterations_count = 100;
+//
+//     std::list<void *> allocated_blocks;
+//     srand((unsigned) time(nullptr));
+//
+//     for (auto i = 0; i < iterations_count; i++)
+//     {
+//         switch (rand() % 2)
+//         {
+//             case 0:
+//             case 1:
+//                 try
+//                 {
+//                     switch (rand() % 2)
+//                     {
+//                         case 0:
+//                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::first_fit);
+//                         case 1:
+//                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_best_fit);
+//                         case 2:
+//                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_worst_fit);
+//                     }
+//
+//                     allocated_blocks.push_front(allocator->allocate(sizeof(void *) * (rand() % 251 + 50)));
+//                     std::cout << "allocation succeeded" << std::endl;
+//                 }
+//                 catch (std::bad_alloc const &ex)
+//                 {
+//                     std::cout << ex.what() << std::endl;
+//                 }
+//                 break;
+//             case 2:
+//                 if (allocated_blocks.empty())
+//                 {
+//                     std::cout << "No blocks to deallocate" << std::endl;
+//
+//                     break;
+//                 }
+//
+//                 auto it = allocated_blocks.begin();
+//                 std::advance(it, rand() % allocated_blocks.size());
+//                 allocator->deallocate(*it, 1);
+//                 allocated_blocks.erase(it);
+//                 std::cout << "deallocation succeeded" << std::endl;
+//                 break;
+//         }
+//     }
+//
+//     while (!allocated_blocks.empty())
+//     {
+//         auto it = allocated_blocks.begin();
+//         std::advance(it, rand() % allocated_blocks.size());
+//         allocator->deallocate(*it, 1);
+//         allocated_blocks.erase(it);
+//         std::cout << "deallocation succeeded" << std::endl;
+//     }
+// }
+
 TEST(positiveTests, test53)
 {
     std::unique_ptr<logger> logger_instance(create_logger(std::vector<std::pair<std::string, logger::severity>>
@@ -152,10 +252,9 @@ TEST(positiveTests, test53)
         switch (rand() % 2)
         {
             case 0:
-            case 1:
                 try
                 {
-                    switch (rand() % 2)
+                    switch (rand() % 3)
                     {
                         case 0:
                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::first_fit);
@@ -168,12 +267,12 @@ TEST(positiveTests, test53)
                     allocated_blocks.push_front(allocator->allocate(sizeof(void *) * (rand() % 251 + 50)));
                     std::cout << "allocation succeeded" << std::endl;
                 }
-                catch (std::bad_alloc const &ex)
-                {
-                    std::cout << ex.what() << std::endl;
-                }
-                break;
-            case 2:
+            catch (std::bad_alloc const &ex)
+            {
+                std::cout << ex.what() << std::endl;
+            }
+            break;
+            case 1:
                 if (allocated_blocks.empty())
                 {
                     std::cout << "No blocks to deallocate" << std::endl;
@@ -181,12 +280,12 @@ TEST(positiveTests, test53)
                     break;
                 }
 
-                auto it = allocated_blocks.begin();
-                std::advance(it, rand() % allocated_blocks.size());
-                allocator->deallocate(*it, 1);
-                allocated_blocks.erase(it);
-                std::cout << "deallocation succeeded" << std::endl;
-                break;
+            auto it = allocated_blocks.begin();
+            std::advance(it, rand() % allocated_blocks.size());
+            allocator->deallocate(*it, 1);
+            allocated_blocks.erase(it);
+            std::cout << "deallocation succeeded" << std::endl;
+            break;
         }
     }
 

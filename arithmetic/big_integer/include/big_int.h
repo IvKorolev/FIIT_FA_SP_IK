@@ -146,6 +146,8 @@ public:
     big_int operator<<(size_t shift) const;
     big_int operator>>(size_t shift) const;
 
+    void optimise() noexcept;
+
     big_int operator~() const;
 
     big_int& operator&=(const big_int& other) &;
@@ -167,15 +169,29 @@ public:
 };
 
 template<class alloc>
-big_int::big_int(const std::vector<unsigned int, alloc> &digits, bool sign, pp_allocator<unsigned int> allocator)
+big_int::big_int(const std::vector<unsigned int, alloc> &digits, bool sign, pp_allocator<unsigned int> allocator) : _sign(sign), _digits(digits.begin(), digits.end(), allocator)
 {
-    throw not_implemented("template<class alloc> big_int::big_int(const std::vector<unsigned int, alloc> &digits, bool sign, pp_allocator<unsigned int> allocator)", "your code should be here...");
 }
 
 template<std::integral Num>
 big_int::big_int(Num d, pp_allocator<unsigned int>)
 {
-    throw not_implemented("template<std::integral Num>big_int::big_int(Num, pp_allocator<unsigned int>)", "your code should be here...");
+    _sign = (d >= 0);
+
+    unsigned long long abs_value = _sign ? d : -static_cast<long long>(d);
+
+    constexpr unsigned long long base = 1ull << (8 * sizeof(unsigned int));
+
+    while (abs_value > 0)
+    {
+        _digits.push_back(abs_value % base);
+        abs_value /= base;
+    }
+
+    if (_digits.empty())
+    {
+        _digits.push_back(0);
+    }
 }
 
 big_int operator""_bi(unsigned long long n);
