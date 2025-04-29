@@ -5,12 +5,9 @@
 #include <allocator_with_fit_mode.h>
 #include <pp_allocator.h>
 #include <logger_guardant.h>
-#include <logger.h>
 #include <typename_holder.h>
 #include <iterator>
 #include <mutex>
-
-
 
 class allocator_boundary_tags final :
     public smart_mem_resource,
@@ -25,26 +22,25 @@ private:
     /**
      * TODO: You must improve it for alignment support
      */
-    mutable std::mutex _allocator_mutex;
     static constexpr const size_t allocator_metadata_size = sizeof(logger*) + sizeof(memory_resource*) + sizeof(allocator_with_fit_mode::fit_mode) +
-                                                            sizeof(size_t) + sizeof(void*);
+                                                            sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
 
     static constexpr const size_t occupied_block_metadata_size = sizeof(size_t) + sizeof(void*) + sizeof(void*) + sizeof(void*);
 
     static constexpr const size_t free_block_metadata_size = 0;
-    logger *_logger;
 
     void *_trusted_memory;
 
 public:
-    
+
+    std::mutex &get_mutex() const noexcept;
+
     ~allocator_boundary_tags() override;
     
     allocator_boundary_tags(allocator_boundary_tags const &other);
     
     allocator_boundary_tags &operator=(allocator_boundary_tags const &other);
-    std::vector<allocator_test_utils::block_info> get_blocks_info_inner() const;
-
+    
     allocator_boundary_tags(
         allocator_boundary_tags &&other) noexcept;
     
@@ -76,39 +72,17 @@ public:
 
 public:
     
-    std::vector<allocator_test_utils::block_info> get_blocks_info() const;
+    std::vector<allocator_test_utils::block_info> get_blocks_info() const override;
+
 private:
 
+    std::vector<allocator_test_utils::block_info> get_blocks_info_inner() const override;
 
 /** TODO: Highly recommended for helper functions to return references */
 
-    logger *get_logger() const override;
-    std::string get_typename() const noexcept override;
-    allocator_with_fit_mode::fit_mode& get_fit_mod() const noexcept;
-    std::string print_blocks() const;
-    void* get_first(size_t s) const noexcept;
-    void* get_best(size_t s) const noexcept;
-    void* get_worst(size_t s) const noexcept;
-    static logger*& get_logger_ptr_ref(void* t);
-    static std::pmr::memory_resource*& get_parent_allocator_ptr_ref(void* t);
-    static allocator_with_fit_mode::fit_mode& get_static_fit_mode_ref(void* t);
-    static size_t& get_user_space_size_ref(void* t);
-    static void*& get_first_occupied_block_ptr_ref(void* t);
-    size_t& get_occupied_user_size_ref(void* bm);
-    void*& get_occupied_prev_ptr_ref(void* bm);
-    void*& get_occupied_next_ptr_ref(void* bm);
-    static void* get_pool_start(void* t);
-    static void* get_pool_end(void* t);
-    static void* get_user_ptr_from_meta(void* bm);
-    static void* get_meta_ptr_from_user(void* up);
-    static size_t& get_block_user_size_ref(void* bm);
-    static void*& get_block_prev_ptr_ref(void* bm);
-    static void*& get_block_next_ptr_ref(void* bm);
-    static void*& get_block_allocator_ptr_ref(void* bm);
+    inline logger *get_logger() const override;
 
-    std::mutex& get_mutex() const noexcept;
-    static size_t get_next_free_size(void* os, void* t) noexcept;
-    size_t get_free_size() const noexcept;
+    inline std::string get_typename() const noexcept override;
 
     class boundary_iterator
     {

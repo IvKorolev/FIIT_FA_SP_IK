@@ -121,7 +121,6 @@ std::string allocator_buddies_system::get_info_in_string(const std::vector<alloc
 std::mutex &allocator_buddies_system::get_mutex() const noexcept
 {
     auto byte_ptr = reinterpret_cast<std::byte*>(_trusted_memory);
-
     return *reinterpret_cast<std::mutex*>(byte_ptr + sizeof(logger*) + sizeof(std::pmr::memory_resource*) + sizeof(fit_mode) + sizeof(unsigned char));
 }
 
@@ -199,11 +198,6 @@ void allocator_buddies_system::do_deallocate_sm(void *at)
 
     information_with_guard("Available free space: " + std::to_string(size_avaliable));
     void* current_block = reinterpret_cast<std::byte*>(at) - occupied_block_metadata_size;
-    // if (*reinterpret_cast<void**>(reinterpret_cast<std::byte*>(at) - sizeof(void*)) != _trusted_memory)
-    // {
-    //     error_with_guard("Tried to deallocate not allocator's property");
-    //     throw std::logic_error("Tried to deallocate not allocator's property");
-    // }
     size_t current_block_size = get_size_block(current_block) - occupied_block_metadata_size;
 
     debug_with_guard("condition of block before deallocate: " + get_dump(reinterpret_cast<char*>(at), current_block_size));
@@ -295,8 +289,6 @@ inline void allocator_buddies_system::set_fit_mode(
 {
     trace_with_guard("allocator_buddies_system::set_fit_mode");
     auto byte_ptr = reinterpret_cast<std::byte*>(_trusted_memory);
-    // auto mutex_ptr = reinterpret_cast<std::mutex*>(byte_ptr + sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char));
-    // std::lock_guard lock(*mutex_ptr);
     std::lock_guard lock(get_mutex());
 
     auto fit_mode_ptr = reinterpret_cast<allocator_with_fit_mode::fit_mode*>(byte_ptr + sizeof(logger*) + sizeof(allocator_dbg_helper*));
@@ -310,9 +302,6 @@ std::vector<allocator_test_utils::block_info> allocator_buddies_system::get_bloc
     if (!_trusted_memory) return blocks_info;
 
     auto byte_ptr = reinterpret_cast<std::byte*>(_trusted_memory);
-    // auto mutex_ptr = reinterpret_cast<std::mutex*>(byte_ptr + sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char));
-    // std::lock_guard lock(*mutex_ptr);
-    //std::lock_guard lock(get_mutex());
     std::cout << "Begin: " << *begin() << ", End: " << *end() << std::endl;
 
     for (auto it = begin(); it != end(); ++it)
@@ -367,16 +356,16 @@ void *allocator_buddies_system::get_best(size_t size) const noexcept
 {
     buddy_iterator res;
 
-    for(auto it = begin(), sent = end(); it != sent; ++it)
+    for (auto it = begin(), sent = end(); it != sent; ++it)
     {
         if (*it == nullptr) {
-            // Проверка на корректность указателя
-            continue;
+            continue; // Пропускаем некорректные указатели
         }
 
-        if (!it.occupied() && it.size() >= size && (it.size() < res.size() || *res == nullptr))
-        {
-            res = it;
+        if (!it.occupied() && it.size() >= size) {
+            if (*res == nullptr || it.size() < res.size()) {
+                res = it;
+            }
         }
     }
 
@@ -387,17 +376,16 @@ void *allocator_buddies_system::get_worst(size_t size) const noexcept
 {
     buddy_iterator res;
 
-    for(auto it = begin(), sent = end(); it != sent; ++it)
+    for (auto it = begin(), sent = end(); it != sent; ++it)
     {
-
         if (*it == nullptr) {
-            // Проверка на корректность указателя
-            continue;
+            continue; // Пропускаем некорректные указатели
         }
 
-        if (!it.occupied() && it.size() >= size && (it.size() > res.size() || *res == nullptr))
-        {
-            res = it;
+        if (!it.occupied() && it.size() >= size) {
+            if (*res == nullptr || it.size() > res.size()) {
+                res = it;
+            }
         }
     }
 
@@ -447,11 +435,6 @@ allocator_buddies_system::buddy_iterator allocator_buddies_system::begin() const
 
 void* allocator_buddies_system::get_twin(void* current_block) noexcept
 {
-    // size_t zero_point = reinterpret_cast<byte*>(current_block) -
-    //         (reinterpret_cast<byte*>(_trusted_memory) + allocator_metadata_size);
-    // size_t delta = zero_point ^ (get_size_block(current_block));
-    //
-    // return slide(_trusted_memory, allocator_metadata_size + delta);
     size_t block_size = get_size_block(current_block);
     size_t offset = reinterpret_cast<byte*>(current_block) -
                    (reinterpret_cast<byte*>(_trusted_memory) + allocator_metadata_size);
