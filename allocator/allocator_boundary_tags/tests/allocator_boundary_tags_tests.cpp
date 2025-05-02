@@ -75,7 +75,7 @@ TEST(positiveTests, test2)
             }
         }));
     std::unique_ptr<smart_mem_resource> allocator_instance(new allocator_boundary_tags(sizeof(unsigned char) * 3000, nullptr, logger_instance.get(), allocator_with_fit_mode::fit_mode::first_fit));
-    
+
     char *first_block = reinterpret_cast<char *>(allocator_instance->allocate(sizeof(char) * 1000));
     char *second_block = reinterpret_cast<char *>(allocator_instance->allocate(sizeof(char) * 0));
     allocator_instance->deallocate(first_block, 1);
@@ -87,13 +87,13 @@ TEST(positiveTests, test2)
             { .block_size = sizeof(allocator_dbg_helper::block_size_t) + sizeof(allocator_dbg_helper::block_pointer_t) * 3, .is_block_occupied = true },
             { .block_size = 3000 - (1000 + (sizeof(allocator_dbg_helper::block_size_t) + sizeof(allocator_dbg_helper::block_pointer_t) * 3) * 2), .is_block_occupied = false }
         };
-    
+
     ASSERT_EQ(actual_blocks_state.size(), expected_blocks_state.size());
     for (int i = 0; i < actual_blocks_state.size(); i++)
     {
         ASSERT_EQ(actual_blocks_state[i], expected_blocks_state[i]);
     }
-    
+
     allocator_instance->deallocate(first_block, 1);
     allocator_instance->deallocate(second_block, 1);
 }

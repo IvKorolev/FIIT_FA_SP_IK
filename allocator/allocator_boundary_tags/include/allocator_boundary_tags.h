@@ -4,6 +4,7 @@
 #include <allocator_test_utils.h>
 #include <allocator_with_fit_mode.h>
 #include <pp_allocator.h>
+#include <sstream>
 #include <logger_guardant.h>
 #include <typename_holder.h>
 #include <iterator>
@@ -33,8 +34,6 @@ private:
 
 public:
 
-    std::mutex &get_mutex() const noexcept;
-
     ~allocator_boundary_tags() override;
     
     allocator_boundary_tags(allocator_boundary_tags const &other);
@@ -59,14 +58,24 @@ public:
     
     [[nodiscard]] void *do_allocate_sm(
         size_t bytes) override;
-    
+
+    void* allocate_first_fit(void* left_elem, size_t size);
+
+    void* allocate_best_fit(void* left_elem, size_t size);
+
+    void* allocate_worst_fit(void* left_elem, size_t size);
+
+    void* create_block_metadata(void* block, size_t size, void* previous=nullptr, void* next=nullptr) noexcept;
+
     void do_deallocate_sm(
         void *at) override;
 
     bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override;
 
 public:
-    
+
+    fit_mode get_fit_mode() const;
+
     inline void set_fit_mode(
         allocator_with_fit_mode::fit_mode mode) override;
 
@@ -80,7 +89,29 @@ private:
 
 /** TODO: Highly recommended for helper functions to return references */
 
+    inline void* slide_block_for(void* block, size_t bytes) const;
+
+    void *get_next_existing_block(void* left_block) const;
+
+    void *get_previous_existing_block(void* right_block) const;
+
+    size_t get_block_distance(void* left_block, void* right_block) const;
+
+    size_t get_block_data_size(void* block) const;
+
+    void *get_first_block() const noexcept;
+
+    void **get_first_block_ptr() const noexcept;
+
     inline logger *get_logger() const override;
+
+    size_t get_size() const;
+
+    std::mutex &get_mutex() const noexcept;
+
+    std::string get_info_in_string() noexcept;
+
+    std::string get_dump(int* at, size_t size);
 
     inline std::string get_typename() const noexcept override;
 
