@@ -428,7 +428,6 @@ void allocator_boundary_tags::do_deallocate_sm(
 
     void* block = reinterpret_cast<void*>(reinterpret_cast<byte*>(at) - occupied_block_metadata_size);
 
-    debug_with_guard(get_dump(reinterpret_cast<int*>(at), get_block_data_size(block)));
     debug_with_guard(get_info_in_string());
 
     void* previous_block = get_previous_existing_block(block);
@@ -458,7 +457,6 @@ void allocator_boundary_tags::do_deallocate_sm(
     else {
         *get_first_block_ptr() = nullptr;
     }
-    debug_with_guard(get_info_in_string());
     debug_with_guard("Deallocating done");
 }
 
@@ -485,13 +483,11 @@ std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_block
     std::vector<allocator_test_utils::block_info> result;
     void* current_block = *get_first_block_ptr();
 
-    // Если нет ни одного блока - весь размер свободен
     if (current_block == nullptr) {
         result.push_back({get_size(), false});
         return result;
     }
 
-    // Проверяем пространство перед первым блоком
     byte* memory_start = reinterpret_cast<byte*>(_trusted_memory) + allocator_metadata_size;
     size_t space_before = reinterpret_cast<byte*>(current_block) - memory_start;
 
@@ -499,7 +495,6 @@ std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_block
         result.push_back({space_before, false});
     }
 
-    // Обрабатываем все блоки
     while (current_block != nullptr) {
         size_t block_size = get_block_data_size(current_block);
         result.push_back({block_size + occupied_block_metadata_size, true});
@@ -508,13 +503,11 @@ std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_block
         byte* current_block_end = reinterpret_cast<byte*>(current_block) + occupied_block_metadata_size + block_size;
 
         if (next_block != nullptr) {
-            // Промежуток между текущим и следующим блоком
             size_t gap_size = reinterpret_cast<byte*>(next_block) - current_block_end;
             if (gap_size > 0) {
                 result.push_back({gap_size, false});
             }
         } else {
-            // Пространство после последнего блока
             byte* memory_end = memory_start + get_size();
             size_t remaining_space = memory_end - current_block_end;
             if (remaining_space > 0) {
@@ -525,207 +518,16 @@ std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_block
         current_block = next_block;
     }
 
-    // Объединяем соседние свободные блоки
     for (auto it = result.begin(); it != result.end(); ) {
         if (!it->is_block_occupied && it + 1 != result.end() && !(it + 1)->is_block_occupied) {
-            it->block_size += (it + 1)->block_size;  // Слияние двух свободных блоков
-            result.erase(it + 1);  // Удаляем второй блок
+            it->block_size += (it + 1)->block_size;
+            result.erase(it + 1);
         } else {
             ++it;
         }
     }
-
-    // Отладочный вывод для отслеживания состояния блоков
-    for (const auto& block : result) {
-        std::cout << (block.is_block_occupied ? "<occup>" : "<avail>")
-                  << "<" << block.block_size << "> | ";
-    }
-    std::cout << std::endl;
-
     return result;
 }
-
-
-// std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_blocks_info() const
-// {
-//     std::vector<allocator_test_utils::block_info> result;
-//     void* current_block = *get_first_block_ptr();
-//
-//     // Если нет ни одного блока - весь размер свободен
-//     if (current_block == nullptr) {
-//         result.push_back({get_size(), false});
-//         return result;
-//     }
-//
-//     // Проверяем пространство перед первым блоком
-//     byte* memory_start = reinterpret_cast<byte*>(_trusted_memory) + allocator_metadata_size;
-//     size_t space_before = reinterpret_cast<byte*>(current_block) - memory_start;
-//
-//     if (space_before > 0) {
-//         result.push_back({space_before, false});
-//     }
-//
-//     // Обрабатываем все блоки
-//     while (current_block != nullptr) {
-//         size_t block_size = get_block_data_size(current_block);
-//         result.push_back({block_size, true});
-//
-//         void* next_block = get_next_existing_block(current_block);
-//         byte* current_block_end = reinterpret_cast<byte*>(current_block) + occupied_block_metadata_size + block_size;
-//
-//         if (next_block != nullptr) {
-//             // Промежуток между текущим и следующим блоком
-//             size_t gap_size = reinterpret_cast<byte*>(next_block) - current_block_end;
-//             if (gap_size > 0) {
-//                 result.push_back({gap_size, false});
-//             }
-//         } else {
-//             // Пространство после последнего блока
-//             byte* memory_end = memory_start + get_size();
-//             size_t remaining_space = memory_end - current_block_end;
-//             if (remaining_space > 0) {
-//                 result.push_back({remaining_space, false});
-//             }
-//         }
-//
-//         current_block = next_block;
-//     }
-//
-//     // Объединяем соседние свободные блоки
-//     for (auto it = result.begin(); it != result.end(); ) {
-//         // Если оба соседних блока свободны, объединяем их
-//         if (!it->is_block_occupied && it + 1 != result.end() && !(it + 1)->is_block_occupied) {
-//             it->block_size += (it + 1)->block_size;  // Слияние двух свободных блоков
-//             result.erase(it + 1);  // Удаляем второй блок
-//         } else {
-//             ++it;
-//         }
-//     }
-//
-//     return result;
-// }
-
-// std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_blocks_info() const
-// {
-//     std::vector<allocator_test_utils::block_info> result;
-//     void* current_block = *get_first_block_ptr();
-//
-//     // Если нет ни одного блока - весь размер свободен
-//     if (current_block == nullptr) {
-//         result.push_back({get_size(), false});
-//         return result;
-//     }
-//
-//     // Проверяем пространство перед первым блоком
-//     byte* memory_start = reinterpret_cast<byte*>(_trusted_memory) + allocator_metadata_size;
-//     size_t space_before = reinterpret_cast<byte*>(current_block) - memory_start;
-//
-//     if (space_before > 0) {
-//         result.push_back({space_before, false});
-//     }
-//
-//     // Обрабатываем все блоки
-//     while (current_block != nullptr) {
-//         size_t block_size = get_block_data_size(current_block);
-//         result.push_back({block_size, true});
-//
-//         void* next_block = get_next_existing_block(current_block);
-//         byte* current_block_end = reinterpret_cast<byte*>(current_block) + occupied_block_metadata_size + block_size;
-//
-//         if (next_block != nullptr) {
-//             // Промежуток между текущим и следующим блоком
-//             size_t gap_size = reinterpret_cast<byte*>(next_block) - current_block_end;
-//             if (gap_size > 0) {
-//                 result.push_back({gap_size, false});
-//             }
-//         } else {
-//             // Пространство после последнего блока
-//             byte* memory_end = memory_start + get_size();
-//             size_t remaining_space = memory_end - current_block_end;
-//             if (remaining_space > 0) {
-//                 result.push_back({remaining_space, false});
-//             }
-//         }
-//
-//         current_block = next_block;
-//     }
-//
-//     // Объединяем соседние свободные блоки
-//     for (auto it = result.begin(); it != result.end(); ) {
-//         if (!it->is_block_occupied && it + 1 != result.end() && !(it + 1)->is_block_occupied) {
-//             it->block_size += (it + 1)->block_size;
-//             result.erase(it + 1);
-//         } else {
-//             ++it;
-//         }
-//     }
-//
-//     return result;
-// }
-
-// std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_blocks_info() const
-// {
-//     //trace_with_guard("started getting blocks info");
-//     std::vector<allocator_test_utils::block_info> result;
-//     size_t full_size_avail = 0;
-//
-//     void* first_block = *get_first_block_ptr();
-//
-//     if (first_block == nullptr) {
-//         full_size_avail = get_size();
-//         result.push_back({full_size_avail, false});
-//         return result;
-//     }
-//
-//     void* current_block = first_block;
-//     void* next_block = get_next_existing_block(current_block);
-//
-//     if (get_previous_existing_block(current_block) == nullptr) {
-//         size_t first_available_block_size = get_block_distance(slide_block_for(_trusted_memory, allocator_metadata_size), current_block);
-//         if (first_available_block_size > 0) {
-//             full_size_avail += first_available_block_size;
-//             result.push_back({first_available_block_size, false});
-//         }
-//         result.push_back({get_block_data_size(current_block), true});
-//     }
-//     else {
-//         throw std::logic_error("Immpossible situation: a block before the first block");
-//     }
-//
-//     while (current_block != nullptr)
-//     {
-//         size_t size_between_two_blocks = 0;
-//         bool t_ = false;
-//         if (next_block == nullptr)
-//         {
-//             void* start = slide_block_for(current_block, occupied_block_metadata_size + get_block_data_size(current_block));
-//             void* end = slide_block_for(_trusted_memory, allocator_metadata_size + get_size());
-//
-//             size_between_two_blocks = reinterpret_cast<byte*>(end) - reinterpret_cast<byte*>(start);
-//
-//             if (size_between_two_blocks > 0) {
-//                 full_size_avail += size_between_two_blocks;
-//                 result.push_back({size_between_two_blocks, false});
-//             }
-//             return result;
-//         }
-//         else
-//         {
-//             void* next_load_block = next_block;
-//             void* end_for_current_block = slide_block_for(current_block, occupied_block_metadata_size + get_block_data_size(current_block));
-//             size_between_two_blocks = reinterpret_cast<byte*>(next_block) - reinterpret_cast<byte*>(end_for_current_block);
-//             if (size_between_two_blocks > 0) {
-//                 full_size_avail += size_between_two_blocks;
-//                 result.push_back({size_between_two_blocks, false});
-//             }
-//             result.push_back({get_block_data_size(next_block), true});
-//         }
-//         current_block = next_block;
-//         next_block = get_next_existing_block(current_block);
-//     }
-//     //trace_with_guard("End getting info about blocks");
-//     return result;
-// }
 
 inline void* allocator_boundary_tags::slide_block_for(void* block, size_t bytes) const
 {
@@ -804,25 +606,6 @@ inline std::string allocator_boundary_tags::get_typename() const noexcept
 
 std::vector<allocator_test_utils::block_info> allocator_boundary_tags::get_blocks_info_inner() const
 {
-    // std::vector<allocator_test_utils::block_info> blocks_info;
-    //
-    // // Проверка, есть ли выделенная память
-    // if (!_trusted_memory) {
-    //     return blocks_info;
-    // }
-    //
-    // // Инициализация итераторов для начала и конца области памяти
-    // for (auto it = begin(); it != end(); ++it) {
-    //     // Собираем информацию о каждом блоке
-    //     allocator_test_utils::block_info info;
-    //     info.block_size = it.size();    // Размер текущего блока
-    //     info.is_block_occupied = it.occupied(); // Статус блока: занят или нет
-    //
-    //     // Добавляем информацию о блоке в вектор
-    //     blocks_info.push_back(info);
-    // }
-    //
-    // return blocks_info;
     throw not_implemented("allocator_red_black_tree::allocator_red_black_tree(allocator_red_black_tree &&) noexcept", "your code should be here...");
 }
 
@@ -854,59 +637,6 @@ std::string allocator_boundary_tags::get_dump(int* at, size_t size)
         result += std::to_string(static_cast<int>(at[i])) + " ";
     }
     return result;
-}
-
-allocator_boundary_tags::allocator_boundary_tags(const allocator_boundary_tags &other)
-{
-    if (other._trusted_memory == nullptr) {
-        _trusted_memory = nullptr; // Если в другом объекте память не выделена, то и в этом объекте она не выделяется
-        return;
-    }
-
-    // Копирование метаданных из другого объекта
-    auto byte_ptr_other = reinterpret_cast<std::byte*>(other._trusted_memory);
-    size_t total_size = *reinterpret_cast<size_t*>(byte_ptr_other + sizeof(logger*) + sizeof(std::pmr::memory_resource*) + sizeof(allocator_with_fit_mode::fit_mode) + sizeof(size_t));
-
-    // Выделяем новую память
-    _trusted_memory = ::operator new(total_size, std::align_val_t(alignof(std::max_align_t)));
-
-    if (!_trusted_memory) {
-        throw std::bad_alloc(); // Если не удалось выделить память, генерируем исключение
-    }
-
-    // Копируем данные из other в текущий объект
-    std::memcpy(_trusted_memory, other._trusted_memory, total_size);
-
-    // Здесь мы можем добавить дополнительную логику, если нужно, для копирования специфичных частей данных
-    // Например, логгеры и другие структуры
-}
-
-allocator_boundary_tags &allocator_boundary_tags::operator=(const allocator_boundary_tags &other)
-{
-    if (this != &other) {
-        // Очистка текущего объекта, если память была выделена
-        if (_trusted_memory) {
-            ::operator delete(_trusted_memory);
-            _trusted_memory = nullptr;
-        }
-
-        // Копирование данных из другого объекта
-        if (other._trusted_memory != nullptr) {
-            auto byte_ptr_other = reinterpret_cast<std::byte*>(other._trusted_memory);
-            size_t total_size = *reinterpret_cast<size_t*>(byte_ptr_other + sizeof(logger*) + sizeof(std::pmr::memory_resource*) + sizeof(allocator_with_fit_mode::fit_mode) + sizeof(size_t));
-
-            // Выделяем память для нового объекта
-            _trusted_memory = ::operator new(total_size);
-
-            if (!_trusted_memory) {
-                throw std::bad_alloc(); // Если не удалось выделить память
-            }
-
-            // Копируем данные
-            std::memcpy(_trusted_memory, other._trusted_memory, total_size);
-        }
-    }
-    return *this;
 }
 
 bool allocator_boundary_tags::do_is_equal(const std::pmr::memory_resource &other) const noexcept

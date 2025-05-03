@@ -133,7 +133,6 @@ std::mutex &allocator_buddies_system::get_mutex() const noexcept
     size_t real_size = size + occupied_block_metadata_size;
 
     information_with_guard("Allocator before allocated: current condition of blocks: " + get_info_in_string(get_blocks_info()));
-    information_with_guard("Free memory to allocate: " + std::to_string(free_space));
     trace_with_guard(get_typename() + " allocating " + std::to_string(real_size) + " bytes ");
 
     void* free_block;
@@ -181,7 +180,6 @@ std::mutex &allocator_buddies_system::get_mutex() const noexcept
     trace_with_guard(get_typename() + " allocated " + std::to_string(real_size) + " bytes ");
 
     information_with_guard("Condition of blocks after allocation: " + get_info_in_string(get_blocks_info()));
-    information_with_guard("Available free space: " + std::to_string(free_space));
 
     return slide(free_block, occupied_block_metadata_size);
 }
@@ -196,7 +194,6 @@ void allocator_buddies_system::do_deallocate_sm(void *at)
     information_with_guard("Blocks condition before deallocate: \n" +
             get_info_in_string(get_blocks_info()));
 
-    information_with_guard("Available free space: " + std::to_string(size_avaliable));
     void* current_block = reinterpret_cast<std::byte*>(at) - occupied_block_metadata_size;
     size_t current_block_size = get_size_block(current_block) - occupied_block_metadata_size;
 
@@ -206,7 +203,6 @@ void allocator_buddies_system::do_deallocate_sm(void *at)
 
     void* twin = get_twin(current_block);
 
-    // merge twins until meet using block
     while (get_size_block(current_block) < get_size_full() &&
            get_size_block(current_block) == get_size_block(twin) && !is_occupied(twin))
     {
@@ -222,52 +218,6 @@ void allocator_buddies_system::do_deallocate_sm(void *at)
     trace_with_guard("Ended deallocate");
 
     information_with_guard("Blocks condition after deallocate: \n" + get_info_in_string(get_blocks_info()));
-
-    information_with_guard("Available free space: " + std::to_string(size_avaliable));
-}
-
-allocator_buddies_system::allocator_buddies_system(const allocator_buddies_system &other)
-{
-    if (other._trusted_memory) {
-        size_t real_size = __detail::nearest_greater_k_of_2(
-            reinterpret_cast<const unsigned char*>(other._trusted_memory)[sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode)]);
-        _trusted_memory = ::operator new(real_size);
-        std::memcpy(_trusted_memory, other._trusted_memory, real_size);
-    } else {
-        _trusted_memory = nullptr;
-    }
-    debug_with_guard("allocator_buddies_system::copy constructor");
-}
-
-allocator_buddies_system &allocator_buddies_system::operator=(const allocator_buddies_system &other)
-{
-    if (this != &other) {
-        // Освобождаем текущую память
-        if (_trusted_memory) {
-            auto byte_ptr = reinterpret_cast<std::byte*>(_trusted_memory);
-            auto mutex_ptr = reinterpret_cast<std::mutex*>(byte_ptr + sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char));
-            mutex_ptr->~mutex();
-            ::operator delete(_trusted_memory);
-        }
-
-        _trusted_memory = nullptr;
-
-        // Копируем данные из другого объекта
-        if (other._trusted_memory) {
-            size_t real_size = __detail::nearest_greater_k_of_2(
-                reinterpret_cast<const unsigned char*>(other._trusted_memory)[sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode)]);
-            _trusted_memory = ::operator new(real_size);
-            std::memcpy(_trusted_memory, other._trusted_memory, real_size);
-
-            // Инициализируем мьютекс
-            auto byte_ptr = reinterpret_cast<std::byte*>(_trusted_memory);
-            auto mutex_ptr = reinterpret_cast<std::mutex*>(byte_ptr + sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char));
-            new (mutex_ptr) ::std::mutex();
-        }
-    }
-
-    debug_with_guard("allocator_buddies_system::copy assignment operator");
-    return *this;
 }
 
 bool allocator_buddies_system::do_is_equal(const std::pmr::memory_resource &other) const noexcept
