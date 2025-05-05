@@ -196,4 +196,6 @@ big_int::big_int(Num d, pp_allocator<unsigned int>)
 
 big_int operator""_bi(unsigned long long n);
 
+#define threshold 32
+
 #endif //MP_OS_BIG_INT_H

@@ -42,6 +42,12 @@ public:
 
     fraction operator/(fraction const &other) const;
 
+    big_int find_denominator(const fraction* first, const fraction* second);
+
+    fraction abs() const;
+
+    fraction pi() const;
+
 public:
 
     bool operator==(fraction const &other) const noexcept;

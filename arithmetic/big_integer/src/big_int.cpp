@@ -17,13 +17,11 @@ constexpr size_t BASE = 1ULL << (8 * sizeof(unsigned int));
 std::strong_ordering big_int::operator<=>(const big_int &other) const noexcept {
     if (*this == other) return std::strong_ordering::equal;
 
-    // Если знаки разные
     if (_sign != other._sign) {
         return _sign ? std::strong_ordering::greater : std::strong_ordering::less;
     }
 
-    // Сравнение по абсолютной величине
-    bool compare_as_positive = _sign; // если положительные — обычное сравнение, если отрицательные — наоборот
+    bool compare_as_positive = _sign;
 
     if (_digits.size() != other._digits.size()) {
         if (_digits.size() < other._digits.size())
@@ -75,8 +73,12 @@ big_int big_int::operator--(int)
 
 big_int &big_int::operator+=(const big_int &other) &
 {
+    if (_sign && !other._sign) {
+        return minus_assign(other);
+    }
     return plus_assign(other);
 }
+
 
 big_int& big_int::operator-=(const big_int& other) & {
     // A - B
@@ -266,11 +268,9 @@ big_int &big_int::operator<<=(size_t shift) &
     const size_t digits_shift = shift / bits_per_digit;
     const size_t bits_shift = shift % bits_per_digit;
 
-    // Добавляем целые разряды (нули слева)
     if (digits_shift > 0)
         _digits.insert(_digits.begin(), digits_shift, 0);
 
-    // Если остался битовый сдвиг
     if (bits_shift > 0)
     {
         unsigned int carry = 0;
@@ -297,19 +297,17 @@ big_int &big_int::operator>>=(size_t shift) &
     const size_t digits_shift = shift / bits_per_digit;
     const size_t bits_shift = shift % bits_per_digit;
 
-    // Удаляем целые разряды справа
     if (digits_shift > 0)
     {
         if (digits_shift >= _digits.size())
         {
-            _digits = {0};  // Результат — ноль
-            _sign = false;   // Ноль всегда беззнаковый
+            _digits = {0};
+            _sign = false;
             return *this;
         }
         _digits.erase(_digits.begin(), _digits.begin() + digits_shift);
     }
 
-    // Если остался битовый сдвиг
     if (bits_shift > 0)
     {
         unsigned int carry = 0;
@@ -327,44 +325,36 @@ big_int &big_int::operator>>=(size_t shift) &
 
 big_int &big_int::plus_assign(const big_int &other, size_t shift) &
 {
-    // Увеличиваем размер текущего числа, если это необходимо
+    const unsigned int mask = __detail::generate_half_mask();
     if (_digits.size() < other._digits.size() + shift)
     {
         _digits.resize(other._digits.size() + shift, 0);
     }
 
-    unsigned long long carry = 0; // Перенос
-    size_t i = 0;
+    unsigned int carry = 0;
 
-    // Сложение поразрядно
-    for (; i < other._digits.size(); ++i)
+    for (size_t i = 0; i < other._digits.size(); ++i)
     {
-        unsigned long long sum = static_cast<unsigned long long>(_digits[i + shift]) +
-                                 static_cast<unsigned long long>(other._digits[i]) +
-                                 carry;
-        _digits[i + shift] = static_cast<unsigned int>(sum);  // вместо sum & half_mask
-        carry = sum >> (sizeof(unsigned int) * 8);
+        unsigned int a = _digits[i], b = i < shift ? 0 : i - shift < other._digits.size() ?  other._digits[i - shift] : 0;
+
+        unsigned int sum = (a & mask) + (b & mask) + carry;
+        carry = sum & (1u << (sizeof(unsigned int) * 4)) ? 1 : 0;
+        sum &= mask;
+
+        unsigned int sum_high = ((a >> (sizeof(unsigned int) * 4)) & mask) +
+                                ((b >> (sizeof(unsigned int) * 4)) & mask) + carry;
+        carry = sum_high & (1u << (sizeof(unsigned int) * 4)) ? 1 : 0;
+        sum_high &= mask;
+
+        _digits[i] = (sum_high << (sizeof(unsigned int) * 4)) + sum;
     }
 
-    // Обработка оставшегося переноса
-    while (carry > 0 && i + shift < _digits.size())
+    if (carry != 0)
     {
-        unsigned long long sum = static_cast<unsigned long long>(_digits[i + shift]) + carry;
-        //_digits[i + shift] = static_cast<unsigned int>(sum & __detail::generate_half_mask());
-        _digits[i + shift] = static_cast<unsigned int>(sum);  // вместо sum & half_mask
-        carry = sum >> (sizeof(unsigned int) * 8);
-        ++i;
+        _digits.push_back(carry);
     }
 
-    // Если перенос остался, добавляем новый разряд
-    if (carry > 0)
-    {
-        _digits.push_back(static_cast<unsigned int>(carry));
-    }
-
-    // Оптимизация для удаления ведущих нулей
     optimise();
-
     return *this;
 }
 
@@ -375,43 +365,32 @@ big_int &big_int::minus_assign(const big_int &other, size_t shift) &
         _digits.resize(other._digits.size() + shift, 0);
     }
 
-    int carry = 0;
-    size_t i = 0;
+    unsigned int borrow = 0;
 
-    for (; i < other._digits.size(); ++i)
+    for (size_t i = 0; i < other._digits.size(); ++i)
     {
-        long long diff = static_cast<long long>(_digits[i + shift]) - other._digits[i] - carry;
-        if (diff < 0)
+        unsigned int a = _digits[i], b = i < shift ? 0 : i - shift < other._digits.size() ? other._digits[i - shift] : 0;
+        b += borrow;
+
+        if (borrow != 0 && b == 0)
         {
-            diff += BASE;
-            carry = 1;
+            continue;
         }
-        else
-        {
-            carry = 0;
-        }
-        _digits[i + shift] = static_cast<unsigned int>(diff);
+
+        borrow = b > a;
+        _digits[i] = a - b;
     }
 
-    for (; carry > 0 && i + shift < _digits.size(); ++i)
+    for (size_t i = other._digits.size(); borrow != 0 && i < _digits.size(); ++i)
     {
-        long long diff = static_cast<long long>(_digits[i + shift]) - carry;
-        if (diff < 0)
-        {
-            diff += BASE;
-            carry = 1;
-        }
-        else
-        {
-            carry = 0;
-        }
-        _digits[i + shift] = static_cast<unsigned int>(diff);
+        unsigned int a = _digits[i];
+        borrow = a > borrow ? 0 : 1;
+        _digits[i] = a - borrow;
     }
 
     optimise();
     return *this;
 }
-
 
 big_int &big_int::operator*=(const big_int &other) &
 {
@@ -426,7 +405,7 @@ big_int &big_int::operator/=(const big_int &other) &
 
 std::string big_int::to_string() const
 {
-    if (_digits.empty())
+    if (_digits.empty() || _digits[0] == 0)
         return "0";
 
     std::stringstream res;
@@ -607,27 +586,23 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
             }
             break;
         case multiplication_rule::Karatsuba: {
-            if (_digits.size() < 32 || other._digits.size() < 32) {
-                // Если числа слишком малы, используем тривиальное умножение
+            if (_digits.size() < threshold || other._digits.size() < threshold) {
                 return multiply_assign(other, multiplication_rule::trivial);
             }
 
             size_t n = std::max(_digits.size(), other._digits.size());
             size_t half = n / 2;
 
-            // Разделяем числа на старшую и младшую части
             big_int low1(std::vector<unsigned int>(_digits.begin(), _digits.begin() + std::min(half, _digits.size())), true);
             big_int high1(std::vector<unsigned int>(_digits.begin() + std::min(half, _digits.size()), _digits.end()), true);
 
             big_int low2(std::vector<unsigned int>(other._digits.begin(), other._digits.begin() + std::min(half, other._digits.size())), true);
             big_int high2(std::vector<unsigned int>(other._digits.begin() + std::min(half, other._digits.size()), other._digits.end()), true);
 
-            // Рекурсивно вычисляем три произведения
             big_int z0 = low1 * low2;
             big_int z1 = (low1 + high1) * (low2 + high2);
             big_int z2 = high1 * high2;
 
-            // Собираем результат
             *this = z2;
             this->plus_assign(z1 - z2 - z0, half);
             this->plus_assign(z0, 0);
