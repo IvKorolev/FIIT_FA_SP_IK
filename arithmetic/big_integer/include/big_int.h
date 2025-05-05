@@ -161,6 +161,8 @@ public:
     big_int operator|(const big_int& other) const;
     big_int operator^(const big_int& other) const;
 
+    big_int multiply_table(const big_int &left, const big_int &right) noexcept;
+
     friend std::ostream &operator<<(std::ostream &stream, big_int const &value);
 
     friend std::istream &operator>>(std::istream &stream, big_int &value);

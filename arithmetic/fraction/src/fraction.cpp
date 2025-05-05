@@ -326,24 +326,6 @@ fraction fraction::pow(size_t degree) const
 
 fraction fraction::root(size_t degree, fraction const &epsilon) const
 {
-    // if (degree == 0) {
-    //     throw std::invalid_argument("Степень корня не может быть равна нулю");
-    // }
-    //
-    // if (*this < fraction(big_int(0), big_int(1)) && degree % 2 == 0) {
-    //     throw std::domain_error("Невозможно вычислить корень четной степени из отрицательного числа");
-    // }
-    //
-    // fraction x = *this; // Начальное приближение
-    // fraction prev_x;
-    //
-    // do {
-    //     prev_x = x;
-    //     x = (fraction(big_int(degree - 1), 1_bi) * x + (*this / x.pow(degree - 1))) / fraction(big_int(degree), 1_bi);
-    // } while ((x - prev_x).abs() > epsilon);
-    //
-    // x.optimise();
-    // return x;
     if (degree == 0)
     {
         throw std::logic_error("Root degree cannot be zero");
@@ -402,40 +384,6 @@ fraction fraction::log2(fraction const &epsilon) const
     return ln(epsilon) / (fraction(2_bi, 1_bi)).ln(epsilon);
 }
 
-// fraction fraction::ln(fraction const &epsilon) const
-// {
-//     fraction x = (*this);
-//
-//     bool swapped = false;
-//     if (x._numerator > x._denominator)
-//     {
-//         std::swap(x._numerator, x._denominator);
-//         swapped = true;
-//     }
-//     x -= fraction(big_int("1"), big_int("1"));
-//
-//     fraction result = fraction(big_int("0"), big_int("1"));
-//     fraction term = fraction(big_int("2"), big_int("1")) * epsilon;
-//     size_t iteration = 1;
-//     int i = 1;
-//
-//     while (term.abs() > epsilon)
-//     {
-//         term =  x.pow(iteration);
-//         term *= fraction(big_int(std::to_string(i)), iteration);
-//
-//         result += term;
-//         ++iteration;
-//         i *= -1;
-//     }
-//     if (swapped)
-//     {
-//         result *= fraction(big_int("-1"), big_int("1"));
-//     }
-//     result.optimise();
-//     return result;
-// }
-
 fraction fraction::ln(fraction const &epsilon) const
 {
     if (*this <= fraction(0, 1))
@@ -481,8 +429,6 @@ fraction fraction::ln(fraction const &epsilon) const
             break;
         }
     } while (iterations < max_iterations && term.abs() > epsilon);
-
-    //fraction ln2 = ln_of_2(epsilon);
 
     fraction ln2 = fraction(big_int(6931471), big_int(10000000));
 

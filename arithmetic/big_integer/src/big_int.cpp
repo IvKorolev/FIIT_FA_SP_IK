@@ -395,7 +395,7 @@ big_int &big_int::minus_assign(const big_int &other, size_t shift) &
 big_int &big_int::operator*=(const big_int &other) &
 {
 
-    return multiply_assign(other, multiplication_rule::Karatsuba);
+    return multiply_assign(other, multiplication_rule::trivial);
 }
 
 big_int &big_int::operator/=(const big_int &other) &
@@ -568,23 +568,47 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
 
     switch (rule)
     {
-        case multiplication_rule::trivial:
+        case multiplication_rule::trivial: {
+
+            result.assign(_digits.size() + other._digits.size(), 0);
+
+            constexpr unsigned int HALF_BITS = sizeof(unsigned int) * 4;
+            constexpr unsigned int HALF_MASK = (1u << HALF_BITS) - 1;
 
             for (size_t i = 0; i < _digits.size(); ++i)
             {
+                unsigned int a = _digits[i];
+                unsigned int a_lo = a & HALF_MASK;
+                unsigned int a_hi = a >> HALF_BITS;
+
                 unsigned long long carry = 0;
+
                 for (size_t j = 0; j < other._digits.size() || carry > 0; ++j)
                 {
-                    unsigned long long current = result[i + j] +
-                                                 static_cast<unsigned long long>(_digits[i]) *
-                                                 (j < other._digits.size() ? other._digits[j] : 0) +
-                                                 carry;
+                    unsigned int b = (j < other._digits.size()) ? other._digits[j] : 0;
+                    unsigned int b_lo = b & HALF_MASK;
+                    unsigned int b_hi = b >> HALF_BITS;
 
-                    result[i + j] = static_cast<unsigned int>(current);
-                    carry = current >> (sizeof(unsigned int) * 8);
+                    // Умножение половинок
+                    unsigned long long p0 = static_cast<unsigned long long>(a_lo) * b_lo;
+                    unsigned long long p1 = static_cast<unsigned long long>(a_lo) * b_hi;
+                    unsigned long long p2 = static_cast<unsigned long long>(a_hi) * b_lo;
+                    unsigned long long p3 = static_cast<unsigned long long>(a_hi) * b_hi;
+
+                    unsigned long long sum =
+                        result[i + j] + (p0 & 0xFFFFFFFFull) + ((p1 + p2) << HALF_BITS) + (p3 << 32) + carry;
+
+                    result[i + j] = static_cast<unsigned int>(sum);
+
+                    carry = sum >> 32;
                 }
             }
-            break;
+
+            _digits = std::move(result);
+            _sign = result_sign;
+            optimise();
+            return *this;
+        }
         case multiplication_rule::Karatsuba: {
             if (_digits.size() < threshold || other._digits.size() < threshold) {
                 return multiply_assign(other, multiplication_rule::trivial);
