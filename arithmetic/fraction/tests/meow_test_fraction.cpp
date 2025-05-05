@@ -695,7 +695,7 @@ auto main(int argc, char **argv) -> int
         {"bigint_logs.txt", logger::severity::information},
     });
 
-    //std::cout << preambula << std::endl;
+    std::cout << preambula << std::endl;
 
     switch (RUN_ALL_TESTS())
     {

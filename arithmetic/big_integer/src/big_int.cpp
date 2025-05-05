@@ -564,13 +564,12 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
     }
 
     std::vector<unsigned int, pp_allocator<unsigned int>> result(_digits.size() + other._digits.size(), 0);
+    //big_int result(0);
     bool result_sign = (_sign == other._sign);
 
     switch (rule)
     {
         case multiplication_rule::trivial: {
-
-            result.assign(_digits.size() + other._digits.size(), 0);
 
             constexpr unsigned int HALF_BITS = sizeof(unsigned int) * 4;
             constexpr unsigned int HALF_MASK = (1u << HALF_BITS) - 1;

@@ -54,7 +54,7 @@ fraction::fraction(f &&numerator, s &&denominator) : _numerator(numerator), _den
 
 fraction::fraction(pp_allocator<big_int::value_type>)
 {
-    //Ya ne eby chto tut pisat
+    //Ya n chto tut pisat
 }
 
 fraction &fraction::operator+=(fraction const &other) &
