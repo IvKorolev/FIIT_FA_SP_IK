@@ -646,45 +646,66 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
     return *this;
 }
 
-big_int &big_int::divide_assign(const big_int &other, big_int::division_rule rule) &
-{
-    if (!other) {
-        throw std::invalid_argument("Division by zero is not allowed.");
+big_int &big_int::divide_assign(const big_int &other, big_int::division_rule rule) &{
+    if (*this == big_int(0)) return *this;
+    if (other == big_int(0)) throw std::logic_error("Division by zero");
+
+    big_int abs_this(*this);
+    abs_this._sign = true;
+    big_int abs_other(other);
+    abs_other._sign = true;
+
+    if (abs_this == abs_other) {
+        _digits.clear();
+        _digits.push_back(1);
+        _sign = (_sign == other._sign);
+        return *this;
     }
 
-    big_int result((pp_allocator<unsigned int>()));
+    if (abs_this < abs_other) {
+        _digits.clear();
+        _digits.push_back(0);
+        _sign = true;
+        return *this;
+    }
 
-    switch (rule) {
-        case division_rule::trivial: {
-            big_int dividend = *this;
-            big_int divisor = other;
-            result = big_int(0);
+    std::vector<unsigned int, pp_allocator<unsigned int>> quotient(_digits.size(), 0, _digits.get_allocator());
+    big_int remain(_digits.get_allocator());
+    remain._digits.clear();
+    remain._digits.push_back(0);
 
-            dividend._sign = true;
-            divisor._sign = true;
-
-            while (dividend >= divisor) {
-                big_int temp_divisor = divisor;
-                big_int quotient = 1;
-
-                while ((temp_divisor << 1) <= dividend) {
-                    temp_divisor <<= 1;
-                    quotient <<= 1;
-                }
-
-                dividend -= temp_divisor;
-                result += quotient;
-            }
-
-            result._sign = (_sign == other._sign);
-            break;
+    for (int i = static_cast<int>(_digits.size()) - 1; i >= 0; i--) {
+        remain._digits.insert(remain._digits.begin(), _digits[i]);
+        while (remain._digits.size() > 1 && remain._digits.back() == 0) {
+            remain._digits.pop_back();
         }
-        case division_rule::Newton:
-        case division_rule::BurnikelZiegler:
-            throw not_implemented("big_int &big_int::divide_assign(const big_int &other, division_rule rule) &", "your code should be here...");
+
+        if (remain._digits.empty()) {
+            remain._sign = true;
+        }
+
+        unsigned long long left = 0, q = 0, right = BASE;
+        while (left <= right) {
+            unsigned long long mid = left + (right - left) / 2;
+            big_int temp = abs_other * big_int(static_cast<long long>(mid), _digits.get_allocator());
+            if (remain >= temp) {
+                q = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        if (q > 0) {
+            big_int temp = abs_other * big_int(static_cast<long long>(q), _digits.get_allocator());
+            remain -= temp;
+        }
+        quotient[i] = static_cast<unsigned int>(q);
     }
 
-    *this = std::move(result);
+    _sign = (_sign == other._sign);
+    _digits = std::move(quotient);
+    optimise();
     return *this;
 }
 

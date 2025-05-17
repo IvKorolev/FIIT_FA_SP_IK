@@ -8,7 +8,8 @@ add_library(
 target_include_directories(
         mp_os_assctv_cntnr_srch_tr_indxng_tr_b_tr
         PUBLIC
-        ./include)
+        ./include
+        "D:/ClionProjects/FIIT_FA_SP_IK/vcpkg/installed/x64-windows/include")
 
 target_link_libraries(
         mp_os_assctv_cntnr_srch_tr_indxng_tr_b_tr
