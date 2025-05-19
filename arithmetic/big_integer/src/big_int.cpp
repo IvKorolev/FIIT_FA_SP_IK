@@ -570,41 +570,8 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
     switch (rule)
     {
         case multiplication_rule::trivial: {
-
-            constexpr unsigned int HALF_BITS = sizeof(unsigned int) * 4;
-            constexpr unsigned int HALF_MASK = (1u << HALF_BITS) - 1;
-
-            for (size_t i = 0; i < _digits.size(); ++i)
-            {
-                unsigned int a = _digits[i];
-                unsigned int a_lo = a & HALF_MASK;
-                unsigned int a_hi = a >> HALF_BITS;
-
-                unsigned long long carry = 0;
-
-                for (size_t j = 0; j < other._digits.size() || carry > 0; ++j)
-                {
-                    unsigned int b = (j < other._digits.size()) ? other._digits[j] : 0;
-                    unsigned int b_lo = b & HALF_MASK;
-                    unsigned int b_hi = b >> HALF_BITS;
-
-                    // Умножение половинок
-                    unsigned long long p0 = static_cast<unsigned long long>(a_lo) * b_lo;
-                    unsigned long long p1 = static_cast<unsigned long long>(a_lo) * b_hi;
-                    unsigned long long p2 = static_cast<unsigned long long>(a_hi) * b_lo;
-                    unsigned long long p3 = static_cast<unsigned long long>(a_hi) * b_hi;
-
-                    unsigned long long sum =
-                        result[i + j] + (p0 & 0xFFFFFFFFull) + ((p1 + p2) << HALF_BITS) + (p3 << 32) + carry;
-
-                    result[i + j] = static_cast<unsigned int>(sum);
-
-                    carry = sum >> 32;
-                }
-            }
-
-            _digits = std::move(result);
-            _sign = result_sign;
+            big_int result = multiply_table(*this, other);
+            *this = result;
             optimise();
             return *this;
         }
@@ -645,6 +612,80 @@ big_int &big_int::multiply_assign(const big_int &other, big_int::multiplication_
     optimise();
     return *this;
 }
+
+big_int big_int::multiply_table(const big_int &left, const big_int &right) noexcept {
+    constexpr unsigned int HALF_BITS = (sizeof(unsigned int) * 8) / 2;  // 16
+    constexpr unsigned int HALF_MASK = (1u << HALF_BITS) - 1;          // 0xFFFF
+
+    size_t n = left._digits.size();
+    size_t m = right._digits.size();
+    big_int result;
+    // Результат может занять n+m+1 разряд
+    result._digits.assign(n + m + 1, 0u);
+
+    for (size_t i = 0; i < n; ++i) {
+        unsigned int a = left._digits[i];
+        unsigned int a_low  = a & HALF_MASK;
+        unsigned int a_high = a >> HALF_BITS;
+
+        for (size_t j = 0; j < m; ++j) {
+            unsigned int b = right._digits[j];
+            unsigned int b_low  = b & HALF_MASK;
+            unsigned int b_high = b >> HALF_BITS;
+
+            // четыре частичных произведения
+            unsigned int p_ll = a_low  * b_low;
+            unsigned int p_lh = a_low  * b_high;
+            unsigned int p_hl = a_high * b_low;
+            unsigned int p_hh = a_high * b_high;
+
+            // 1) аккуратная сумма средних произведений с переносом
+            unsigned int mid_lo = (p_lh & HALF_MASK) + (p_hl & HALF_MASK);
+            unsigned int carry_mid_lo = mid_lo >> HALF_BITS;
+            mid_lo &= HALF_MASK;
+            unsigned int mid_hi = (p_lh >> HALF_BITS) + (p_hl >> HALF_BITS) + carry_mid_lo;
+
+            // 2) собираем low часть: lo_lo | ((lo_hi + mid_lo) << HALF_BITS)
+            unsigned int lo_lo = p_ll & HALF_MASK;
+            unsigned int lo_hi = p_ll >> HALF_BITS;
+            unsigned int res_lo_hi = lo_hi + mid_lo;
+            unsigned int carry_lo = res_lo_hi >> HALF_BITS;
+            res_lo_hi &= HALF_MASK;
+            unsigned int low = (res_lo_hi << HALF_BITS) | lo_lo;
+
+            // 3) общий перенос в high: carry_lo + mid_hi + (p_hh low part)
+            unsigned int carry_low = carry_lo + mid_hi;
+            unsigned int high = p_hh + carry_low;
+
+            // Двухшаговая схема добавления с переносом, используя только unsigned int
+
+            // используя только unsigned int
+            // 1) Добавляем low
+            unsigned int sum1   = result._digits[i + j] + low;
+            unsigned int carry1 = (sum1 < low) ? 1u : 0u;
+            result._digits[i + j] = sum1;
+
+            // 2) Добавляем high + carry1
+            unsigned int to_add = high + carry1;
+            unsigned int sum2   = result._digits[i + j + 1] + to_add;
+            unsigned int carry2 = (sum2 < to_add) ? 1u : 0u;
+            result._digits[i + j + 1] = sum2;
+
+            // Финальный перенос
+            result._digits[i + j + 2] += carry2;
+        }
+    }
+
+    // Убираем ведущие нули
+    while (result._digits.size() > 1 && result._digits.back() == 0u) {
+        result._digits.pop_back();
+    }
+
+    result._sign = (left._sign == right._sign);
+    result.optimise();
+    return result;
+}
+
 
 big_int &big_int::divide_assign(const big_int &other, big_int::division_rule rule) &{
     if (*this == big_int(0)) return *this;
