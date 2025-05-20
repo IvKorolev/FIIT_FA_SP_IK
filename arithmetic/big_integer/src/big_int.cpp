@@ -657,8 +657,6 @@ big_int big_int::multiply_table(const big_int &left, const big_int &right) noexc
             unsigned int carry_low = carry_lo + mid_hi;
             unsigned int high = p_hh + carry_low;
 
-            // Двухшаговая схема добавления с переносом, используя только unsigned int
-
             // используя только unsigned int
             // 1) Добавляем low
             unsigned int sum1   = result._digits[i + j] + low;

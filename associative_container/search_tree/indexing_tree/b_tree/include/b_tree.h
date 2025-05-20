@@ -1698,8 +1698,9 @@ void B_tree<tkey, tvalue, compare, t>::borrow_from_prev(
 
     if (sibling->_keys.empty()) throw std::runtime_error("Borrowing key from empty sibling node.");
     bool sibling_is_leaf = sibling->_pointers.empty();
-    if (!sibling_is_leaf && sibling->_pointers.empty()) throw std::runtime_error("Borrowing pointer from childless internal sibling node.");
-
+    // if (!sibling_is_leaf && sibling->_pointers.empty()) {
+    //     throw std::runtime_error("Borrowing pointer from childless internal sibling node.");
+    // }
     child->_keys.insert(child->_keys.begin(), std::move(node->_keys[parent_key_idx]));
     node->_keys[parent_key_idx] = std::move(sibling->_keys.back());
     sibling->_keys.pop_back();
