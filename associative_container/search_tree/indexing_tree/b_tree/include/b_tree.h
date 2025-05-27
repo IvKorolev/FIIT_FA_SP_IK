@@ -1828,157 +1828,86 @@ void B_tree<tkey, tvalue, compare, t>::clear() noexcept {
 
 template<typename tkey, typename tvalue, compator<tkey> compare, std::size_t t>
 std::pair<typename B_tree<tkey, tvalue, compare, t>::btree_iterator, bool>
-B_tree<tkey, tvalue, compare, t>::insert(const tree_data_type& data)
-{
-    static constexpr std::size_t current_t = t;
-    using Node = btree_node;
-    using NodeStar = Node*;
+B_tree<tkey, tvalue, compare, t>::insert(const tree_data_type& data) {
+	if (!_root) {
+		_root = new btree_node();
+		_root->_keys.push_back(data);
+		_size = 1;
+		return {btree_iterator(), true};
+	}
 
-    if (this->_logger) {
-        this->_logger->trace("B_tree insert [HYBRID SPLIT] called.");
-    }
-    tkey key_copy = data.first;
+	std::stack<std::pair<btree_node*, size_t>> path_stack;
+	btree_node* cur = _root;
 
-    if (!this->_root) {
-        pp_allocator<Node> node_alloc(this->_allocator);
-        this->_root = node_alloc.template new_object<Node>();
-        this->_root->_keys.push_back(data);
-        this->_size = 1;
-        std::stack<std::pair<NodeStar*, size_t>> path_stack;
-        path_stack.push({&this->_root, static_cast<size_t>(-1)});
-        return {btree_iterator(path_stack, 0), true};
-    }
+	while (true) {
+		size_t idx = 0;
+		while (idx < cur->_keys.size() && compare_keys(cur->_keys[idx].first, data.first)) {
+			++idx;
+		}
+		path_stack.push({cur, idx});
+		if (cur->_pointers.empty()) break;
+		cur = cur->_pointers[idx];
+	}
 
-    btree_iterator existing_it = this->find(key_copy);
-    if (existing_it != this->end()) {
-        return {existing_it, false};
-    }
+	auto& keys = cur->_keys;
+	auto it = std::lower_bound(
+			keys.begin(), keys.end(), data,
+			[this](auto const& a, auto const& b) { return compare_pairs(a, b); }
+	);
+	if (it != keys.end() &&
+		!compare_keys(data.first, it->first) &&
+		!compare_keys(it->first, data.first)) {
+		return {btree_iterator(), false};
+	}
+	keys.insert(it, data);
+	++_size;
 
-    if (this->_root->_keys.size() == (2 * current_t - 1)) {
-        pp_allocator<Node> node_alloc(this->_allocator);
-        NodeStar old_root_node = this->_root;
-        NodeStar new_empty_root = node_alloc.template new_object<Node>();
+	while (!path_stack.empty()) {
+		auto [node, child_idx] = path_stack.top();
+		path_stack.pop();
 
-        new_empty_root->_pointers.push_back(old_root_node);
-        this->_root = new_empty_root;
+		if (node->_keys.size() <= maximum_keys_in_node) break;
 
-        NodeStar parent_for_split = this->_root;
-        size_t child_idx_for_split = 0;
-        NodeStar y_to_split = old_root_node;
-        NodeStar z_new_sibling = node_alloc.template new_object<Node>();
-        bool y_was_leaf_when_split = y_to_split->_pointers.empty();
+		size_t mid = t;
+		auto mid_key = node->_keys[mid];
+		btree_node* right = new btree_node();
+		right->_keys.assign(
+				node->_keys.begin() + mid + 1,
+				node->_keys.end()
+		);
+		node->_keys.resize(mid);
 
-        std::vector<tree_data_type> z_keys_buffer_root;
-        std::vector<NodeStar> z_pointers_buffer_root;
-        std::vector<tree_data_type> y_keys_buffer_root;
-        std::vector<NodeStar> y_pointers_buffer_root;
+		if (!node->_pointers.empty()) {
+			right->_pointers.assign(
+					node->_pointers.begin() + mid + 1,
+					node->_pointers.end()
+			);
+			node->_pointers.resize(mid + 1);
+		}
 
-        if (current_t >= y_to_split->_keys.size()) {
-            if(_logger) _logger->error("Split logic error (root V2): median index 'current_t' out of bounds.");
-        }
+		if (path_stack.empty()) {
+			btree_node* new_root = new btree_node();
+			new_root->_keys.push_back(mid_key);
+			new_root->_pointers.push_back(node);
+			new_root->_pointers.push_back(right);
+			_root = new_root;
+		} else {
+			auto [parent, ignored] = path_stack.top();
 
-        if (current_t >= 2) z_keys_buffer_root.reserve(current_t - 2);
-        for (size_t j = 0; j < current_t - 2; ++j) z_keys_buffer_root.push_back(std::move(y_to_split->_keys[current_t + 1 + j]));
-        if (!y_was_leaf_when_split && current_t >= 1) {
-            z_pointers_buffer_root.reserve(current_t - 1);
-            for (size_t j = 0; j < current_t - 1; ++j)
-                if((current_t + 1 + j) < y_to_split->_pointers.size()) z_pointers_buffer_root.push_back(y_to_split->_pointers[current_t + 1 + j]);
-        }
+			auto insert_it = std::lower_bound(
+					parent->_keys.begin(),
+					parent->_keys.end(),
+					mid_key,
+					[this](auto const& a, auto const& b){ return compare_pairs(a, b); }
+			);
+			size_t pos = std::distance(parent->_keys.begin(), insert_it);
 
-        tree_data_type median_key_to_parent = std::move(y_to_split->_keys[current_t]);
+			parent->_keys.insert(parent->_keys.begin() + pos, mid_key);
+			parent->_pointers.insert(parent->_pointers.begin() + pos + 1, right);
+		}
+	}
 
-        y_keys_buffer_root.reserve(current_t);
-        for(size_t j=0; j < current_t; ++j) y_keys_buffer_root.push_back(std::move(y_to_split->_keys[j]));
-        if (!y_was_leaf_when_split) {
-            y_pointers_buffer_root.reserve(current_t + 1);
-            for(size_t j=0; j < current_t + 1; ++j)
-                if(j < y_to_split->_pointers.size()) y_pointers_buffer_root.push_back(y_to_split->_pointers[j]);
-        }
-
-        z_new_sibling->_keys.assign(std::make_move_iterator(z_keys_buffer_root.begin()), std::make_move_iterator(z_keys_buffer_root.end()));
-        if (!y_was_leaf_when_split) z_new_sibling->_pointers.assign(z_pointers_buffer_root.begin(), z_pointers_buffer_root.end());
-        y_to_split->_keys.assign(std::make_move_iterator(y_keys_buffer_root.begin()), std::make_move_iterator(y_keys_buffer_root.end()));
-        if (!y_was_leaf_when_split) y_to_split->_pointers.assign(y_pointers_buffer_root.begin(), y_pointers_buffer_root.end());
-
-        parent_for_split->_pointers.insert(parent_for_split->_pointers.begin() + child_idx_for_split + 1, z_new_sibling);
-        parent_for_split->_keys.insert(parent_for_split->_keys.begin() + child_idx_for_split, std::move(median_key_to_parent));
-    }
-
-
-    NodeStar* current_node_outer_ptr = &this->_root;
-    pp_allocator<Node> node_alloc_loop(this->_allocator);
-
-    while (true) {
-        NodeStar current_node = *current_node_outer_ptr;
-
-        if (current_node->_pointers.empty()) {
-            auto insert_pos_it = std::lower_bound(
-                    current_node->_keys.begin(), current_node->_keys.end(), key_copy,
-                    [this](const tree_data_type& p, const tkey& k){ return this->compare_keys(p.first, k); });
-            current_node->_keys.insert(insert_pos_it, data);
-            this->_size++;
-            return {this->find(key_copy), true};
-        }
-
-        auto descend_it = std::lower_bound(
-                current_node->_keys.begin(), current_node->_keys.end(), key_copy,
-                [this](const tree_data_type& p, const tkey& k){ return this->compare_keys(p.first, k); });
-        size_t next_child_idx = std::distance(current_node->_keys.begin(), descend_it);
-
-        if (next_child_idx >= current_node->_pointers.size() || current_node->_pointers[next_child_idx] == nullptr) {
-            if (this->_logger) this->_logger->error("Invalid child index or null child pointer before checking fullness (loop HYBRID).");
-        }
-        NodeStar child_node_to_descend = current_node->_pointers[next_child_idx];
-
-        if (child_node_to_descend->_keys.size() == maximum_keys_in_node) {
-            NodeStar parent_for_split = current_node;
-            size_t child_idx_for_split = next_child_idx;
-            NodeStar y_to_split = child_node_to_descend;
-            NodeStar z_new_sibling = node_alloc_loop.template new_object<Node>();
-            bool y_was_leaf_when_split = y_to_split->_pointers.empty();
-
-            std::vector<tree_data_type> z_keys_buffer_loop;
-            std::vector<NodeStar> z_pointers_buffer_loop;
-            std::vector<tree_data_type> y_final_keys_buffer_loop;
-            std::vector<NodeStar> y_final_pointers_buffer_loop;
-
-            z_keys_buffer_loop.reserve(current_t - 1);
-            for (size_t j = 0; j < current_t - 1; ++j) z_keys_buffer_loop.push_back(std::move(y_to_split->_keys[current_t + j]));
-            if (!y_was_leaf_when_split) {
-                z_pointers_buffer_loop.reserve(current_t);
-                for (size_t j = 0; j < current_t; ++j)
-                    if((current_t + j) < y_to_split->_pointers.size())
-                        z_pointers_buffer_loop.push_back(y_to_split->_pointers[current_t + j]);
-            }
-
-            tree_data_type median_key_to_parent = std::move(y_to_split->_keys[current_t - 1]);
-            y_final_keys_buffer_loop.reserve(current_t - 1);
-            for (size_t j = 0; j < current_t - 1; ++j) y_final_keys_buffer_loop.push_back(std::move(y_to_split->_keys[j]));
-            if (!y_was_leaf_when_split) {
-                y_final_pointers_buffer_loop.reserve(current_t);
-                for (size_t j = 0; j < current_t; ++j)
-                    if(j < y_to_split->_pointers.size())
-                        y_final_pointers_buffer_loop.push_back(y_to_split->_pointers[j]);
-            }
-
-            z_new_sibling->_keys.assign(std::make_move_iterator(z_keys_buffer_loop.begin()), std::make_move_iterator(z_keys_buffer_loop.end()));
-            if (!y_was_leaf_when_split) z_new_sibling->_pointers.assign(z_pointers_buffer_loop.begin(), z_pointers_buffer_loop.end());
-            y_to_split->_keys.assign(std::make_move_iterator(y_final_keys_buffer_loop.begin()), std::make_move_iterator(y_final_keys_buffer_loop.end()));
-            if (!y_was_leaf_when_split) y_to_split->_pointers.assign(y_final_pointers_buffer_loop.begin(), y_final_pointers_buffer_loop.end());
-            parent_for_split->_pointers.insert(parent_for_split->_pointers.begin() + child_idx_for_split + 1, z_new_sibling);
-            parent_for_split->_keys.insert(parent_for_split->_keys.begin() + child_idx_for_split, std::move(median_key_to_parent));
-
-            if (this->compare_keys(parent_for_split->_keys[child_idx_for_split].first, key_copy)) {
-                next_child_idx = child_idx_for_split + 1;
-            } else {
-                next_child_idx = child_idx_for_split;
-            }
-        }
-        if (next_child_idx >= current_node->_pointers.size() || current_node->_pointers[next_child_idx] == nullptr) {
-            if (this->_logger) this->_logger->error("Attempting to descend to an invalid child after split/selection (HYBRID loop).");
-        }
-        current_node_outer_ptr = &(current_node->_pointers[next_child_idx]);
-    }
+	return {btree_iterator(), true};
 }
 
 template<typename tkey, typename tvalue, compator<tkey> compare, std::size_t t>

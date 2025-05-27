@@ -16,10 +16,6 @@ server::server(uint16_t port)
         std::string path_str = req.url_params.get("path");
         std::string console_str = req.url_params.get("console");
 
-//        std::string pid_str("3");
-//        std::string sev_str("TRACE");
-//        std::string path_str("a.txt");
-//        std::string console_str("1");
 
         std::cout << "INIT PID: " << pid_str << " SEVERITY: " << sev_str << " PATH: " << path_str << " CONSOLE: "
                   << console_str << std::endl;
