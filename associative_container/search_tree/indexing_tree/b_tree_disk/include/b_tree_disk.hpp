@@ -635,9 +635,6 @@ B_tree_disk<tkey, tvalue, compare, t>::begin() {
     }
 }
 
-
-
-
 template<serializable tkey, serializable tvalue, compator<tkey> compare, std::size_t t>
 bool B_tree_disk<tkey, tvalue, compare, t>::erase(const tkey& key) {
     try {
